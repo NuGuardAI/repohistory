@@ -1,8 +1,10 @@
 import { Repo } from "@/types";
 import { Octokit } from "octokit";
-import { app } from "./app";
+import { getApp } from "./app";
 
 export async function getRepos(octokit: Octokit) {
+  const app = getApp();
+
   const { data: installationData } = await octokit.request(
     'GET /user/installations',
   );

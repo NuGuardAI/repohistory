@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { app } from '@/utils/octokit/app';
+import { getApp } from '@/utils/octokit/app';
 import { JSDOM } from 'jsdom';
 import { optimize, Config } from 'svgo';
 import XYChart from '@/shared/packages/xy-chart';
@@ -8,6 +8,8 @@ import { replaceSVGContentFilterWithCamelcase, getBase64Image, getChartWidthWith
 import { getRepoStarsChart } from '@/utils/repo/stars';
 import { getRepoInfo } from '@/utils/repo/info';
 import { getOptimalStrokeColor } from '@/utils/color';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -28,6 +30,7 @@ export async function GET(request: NextRequest) {
       throw new Error('Invalid repository format. Use owner/repo');
     }
 
+    const app = getApp();
     const appOctokit = app.octokit;
     const { data: installations } = await appOctokit.rest.apps.listInstallations();
 
