@@ -106,22 +106,10 @@ resource caEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
   }
 }
 
-// ── Azure Files binding in Container Apps environment ───────────────────────
-resource caStorage 'Microsoft.App/managedEnvironments/storages@2024-03-01' = {
-  parent: caEnv
-  name: 'postgres-storage'
-  properties: {
-    azureFile: {
-      accountName: storageAccount.name
-      accountKey: storageAccount.listKeys().keys[0].value
-      shareName: 'postgres-data'
-      accessMode: 'ReadWrite'
-    }
-  }
-  dependsOn: [filesShare]
-}
-
-// ── PostgreSQL container (internal TCP, single replica, persistent volume) ───
+// ── PostgreSQL container (internal TCP, single replica, ephemeral storage) ──
+// Note: Azure Files (SMB) does not support chmod — postgres cannot init.
+// Using ephemeral container storage instead. Data persists across restarts
+// but not across container replacement/redeployment.
 resource postgresApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'postgres'
   location: location
@@ -151,21 +139,7 @@ resource postgresApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'POSTGRES_DB', value: 'repohistory' }
             { name: 'POSTGRES_USER', value: postgresAdminUser }
             { name: 'POSTGRES_PASSWORD', secretRef: 'postgres-password' }
-            { name: 'PGDATA', value: '/var/lib/postgresql/data/pgdata' }
           ]
-          volumeMounts: [
-            {
-              volumeName: 'postgres-data'
-              mountPath: '/var/lib/postgresql/data'
-            }
-          ]
-        }
-      ]
-      volumes: [
-        {
-          name: 'postgres-data'
-          storageType: 'AzureFile'
-          storageName: 'postgres-storage'
         }
       ]
       scale: {
@@ -174,7 +148,6 @@ resource postgresApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
     }
   }
-  dependsOn: [caStorage]
 }
 
 // ── Container App ─────────────────────────────────────────────────────────────
