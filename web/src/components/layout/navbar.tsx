@@ -38,6 +38,9 @@ export function Navbar({ repoInfo, ownerInfo }: NavbarProps) {
             quality={100}
           />
         </Link>
+        <Link href="/nuguard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
+          NuGuard
+        </Link>
         {repoInfo && (
           <h1 className="text-md truncate max-w-xs font-semibold sm:font-bold hidden sm:block">
             <Link
