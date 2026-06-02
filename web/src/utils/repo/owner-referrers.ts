@@ -1,15 +1,13 @@
 import { Octokit } from "octokit";
 import { Repo } from "@/types";
 import { getRepoReferrers } from "./referrers";
-import { createClient } from "@/utils/supabase/server";
 
 export async function getOwnerReferrers(
   octokit: Octokit,
-  supabase: Awaited<ReturnType<typeof createClient>>,
   repos: Repo[]
 ): Promise<{ referrers: Array<{ referrer: string; data: Array<{ timestamp: string; count: number; uniques: number }> }> }> {
   const repoReferrersPromises = repos.map(repo => 
-    getRepoReferrers(octokit, supabase, repo.full_name, repo.id)
+    getRepoReferrers(octokit, repo.full_name, repo.id)
   );
 
   const allRepoReferrers = await Promise.all(repoReferrersPromises);

@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        'localhost:4000',
+        '*.app.github.dev',
+        '*.azurecontainerapps.io',
+      ],
+    },
+  },
   async redirects() {
     return [
       {

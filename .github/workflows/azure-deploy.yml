@@ -1,0 +1,87 @@
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AZURE_CONTAINER_APP_NAME: repohistory
+  AZURE_RESOURCE_GROUP: repohistory-rg
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+  IMAGE: ${{ secrets.ACR_LOGIN_SERVER }}/repohistory
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Authenticate to Azure ──────────────────────────────────────────────
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ── Push image to ACR using managed identity (az acr login) ───────────
+      - name: Log in to Azure Container Registry
+        run: az acr login --name ${{ secrets.ACR_NAME }}
+
+      # ── Build & push Docker image ──────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:cache,mode=max
+
+      # ── Run DB schema migration (idempotent — CREATE TABLE IF NOT EXISTS) ──
+      # Opens a temporary firewall rule for this runner, runs psql, then removes it.
+      - name: Run database migrations
+        env:
+          PGPASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+        run: |
+          RUNNER_IP=$(curl -sf https://api.ipify.org)
+          RULE_NAME="github-runner-${{ github.run_id }}"
+
+          az postgres flexible-server firewall-rule create \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name repohistory-postgres \
+            --rule-name "$RULE_NAME" \
+            --start-ip-address "$RUNNER_IP" \
+            --end-ip-address "$RUNNER_IP"
+
+          psql \
+            "host=repohistory-postgres.postgres.database.azure.com \
+             port=5432 \
+             dbname=repohistory \
+             user=${{ secrets.POSTGRES_ADMIN_USER }} \
+             sslmode=require" \
+            -f web/db/schema.sql
+
+          az postgres flexible-server firewall-rule delete \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name repohistory-postgres \
+            --rule-name "$RULE_NAME" \
+            --yes
+
+      # ── Deploy updated image to Container Apps ─────────────────────────────
+      - name: Deploy to Azure Container Apps
+        run: |
+          az containerapp update \
+            --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --image ${{ env.IMAGE }}:${{ github.sha }}

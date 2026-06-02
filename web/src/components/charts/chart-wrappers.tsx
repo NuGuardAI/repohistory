@@ -11,7 +11,6 @@ import { getRepoReferrers } from "@/utils/repo/referrers";
 import { getRepoPaths } from "@/utils/repo/paths";
 import { getRepoReleases } from "@/utils/repo/releases";
 import { getUserOctokit } from "@/utils/octokit/get-user-octokit";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface StarsChartWrapperProps {
   fullName: string;
@@ -30,48 +29,44 @@ export async function StarsChartWrapper({ fullName, stargazersCount }: StarsChar
 interface ViewChartWrapperProps {
   fullName: string;
   repoId: number;
-  supabase: SupabaseClient;
 }
 
-export async function ViewChartWrapper({ fullName, repoId, supabase }: ViewChartWrapperProps) {
+export async function ViewChartWrapper({ fullName, repoId }: ViewChartWrapperProps) {
   const octokit = await getUserOctokit();
-  const views = await getRepoViews(octokit, supabase, fullName, repoId);
+  const views = await getRepoViews(octokit, fullName, repoId);
   return <ViewChart traffic={{ views }} />;
 }
 
 interface CloneChartWrapperProps {
   fullName: string;
   repoId: number;
-  supabase: SupabaseClient;
 }
 
-export async function CloneChartWrapper({ fullName, repoId, supabase }: CloneChartWrapperProps) {
+export async function CloneChartWrapper({ fullName, repoId }: CloneChartWrapperProps) {
   const octokit = await getUserOctokit();
-  const clones = await getRepoClones(octokit, supabase, fullName, repoId);
+  const clones = await getRepoClones(octokit, fullName, repoId);
   return <CloneChart traffic={{ clones }} />;
 }
 
 interface ReferrersChartWrapperProps {
   fullName: string;
   repoId: number;
-  supabase: SupabaseClient;
 }
 
-export async function ReferrersChartWrapper({ fullName, repoId, supabase }: ReferrersChartWrapperProps) {
+export async function ReferrersChartWrapper({ fullName, repoId }: ReferrersChartWrapperProps) {
   const octokit = await getUserOctokit();
-  const { referrers } = await getRepoReferrers(octokit, supabase, fullName, repoId);
+  const { referrers } = await getRepoReferrers(octokit, fullName, repoId);
   return <ReferrersChart traffic={{ referrers }} />;
 }
 
 interface PopularContentChartWrapperProps {
   fullName: string;
   repoId: number;
-  supabase: SupabaseClient;
 }
 
-export async function PopularContentChartWrapper({ fullName, repoId, supabase }: PopularContentChartWrapperProps) {
+export async function PopularContentChartWrapper({ fullName, repoId }: PopularContentChartWrapperProps) {
   const octokit = await getUserOctokit();
-  const { paths } = await getRepoPaths(octokit, supabase, fullName, repoId);
+  const { paths } = await getRepoPaths(octokit, fullName, repoId);
   return <PopularContentChart traffic={{ paths }} />;
 }
 

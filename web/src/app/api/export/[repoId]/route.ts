@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserOctokit } from '@/utils/octokit/get-user-octokit';
-import { createClient } from '@/utils/supabase/server';
 import { getRepoViews } from '@/utils/repo/views';
 import { getRepoClones } from '@/utils/repo/clones';
 import { getRepoReferrers } from '@/utils/repo/referrers';
@@ -23,14 +22,13 @@ export async function GET(
     }
 
     const octokit = await getUserOctokit();
-    const supabase = await createClient();
 
     // Fetch all data in parallel
     const [viewsResult, clonesResult, referrersResult, pathsResult] = await Promise.allSettled([
-      getRepoViews(octokit, supabase, fullName, repoId),
-      getRepoClones(octokit, supabase, fullName, repoId),
-      getRepoReferrers(octokit, supabase, fullName, repoId),
-      getRepoPaths(octokit, supabase, fullName, repoId)
+      getRepoViews(octokit, fullName, repoId),
+      getRepoClones(octokit, fullName, repoId),
+      getRepoReferrers(octokit, fullName, repoId),
+      getRepoPaths(octokit, fullName, repoId)
     ]);
 
     const zip = new JSZip();

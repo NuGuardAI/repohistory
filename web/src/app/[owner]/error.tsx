@@ -1,17 +1,36 @@
 'use client';
 
 import { useEffect } from 'react';
-import { signout } from '@/actions/auth';
 
 export default function Error({
   error,
+  reset,
 }: {
-  error: Error & { digest?: string };
+  error: Error & { digest?: string; status?: number };
+  reset: () => void;
 }) {
+  const isAuthError = (error as { status?: number }).status === 401 ||
+    error.message?.includes('Bad credentials') ||
+    error.message?.includes('credentials');
+
   useEffect(() => {
     console.error(error);
-    signout();
-  }, [error]);
+    if (isAuthError) {
+      import('next-auth/react').then(({ signOut }) => signOut({ callbackUrl: '/signin' }));
+    }
+  }, [error, isAuthError]);
 
-  return null;
+  if (isAuthError) return null;
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
+      <p className="text-muted-foreground">Something went wrong loading this page.</p>
+      <button
+        onClick={reset}
+        className="text-sm underline underline-offset-4 hover:text-primary"
+      >
+        Try again
+      </button>
+    </div>
+  );
 }

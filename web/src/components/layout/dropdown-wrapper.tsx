@@ -1,5 +1,7 @@
+'use client';
+
 import Link from "next/link";
-import { createClient } from "@/utils/supabase/server";
+import { useSession, signOut } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -13,17 +15,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, MessageSquare, Bug, Lightbulb } from "lucide-react";
-import { signout } from "@/actions/auth";
 
-export async function DropdownWrapper() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+export function DropdownWrapper() {
+  const { data: session } = useSession();
+  const user = session?.user;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Avatar className="cursor-pointer">
-          <AvatarImage src={user?.user_metadata?.avatar_url} />
+          <AvatarImage src={user?.image ?? undefined} />
           <AvatarFallback>
             {user?.email?.charAt(0).toUpperCase() || "U"}
           </AvatarFallback>
@@ -71,7 +72,7 @@ export async function DropdownWrapper() {
           </DropdownMenuPortal>
         </DropdownMenuSub>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={signout}>
+        <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/signin' })}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign out
         </DropdownMenuItem>

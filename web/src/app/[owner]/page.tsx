@@ -4,7 +4,6 @@ import { OwnerStarsChartWrapper, OwnerViewChartWrapper, OwnerCloneChartWrapper, 
 import { Navbar } from "@/components/layout/navbar";
 import { getUserOctokit } from "@/utils/octokit/get-user-octokit";
 import { getRepos } from "@/utils/octokit/get-repos";
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { StarsChart } from "@/components/charts/stars-chart";
 import { ViewChart } from "@/components/charts/view-chart";
@@ -35,8 +34,6 @@ export default async function OwnerPage({ params }: PageProps) {
     totalStars,
   };
 
-  const supabase = await createClient();
-
   return (
     <DateRangeProvider fullName={owner}>
       <div className="flex flex-col min-h-screen">
@@ -46,16 +43,16 @@ export default async function OwnerPage({ params }: PageProps) {
             <OwnerStarsChartWrapper owner={owner} repos={ownerRepos} />
           </Suspense>
           <Suspense fallback={<ViewChart isLoading />}>
-            <OwnerViewChartWrapper owner={owner} repos={ownerRepos} supabase={supabase} />
+            <OwnerViewChartWrapper owner={owner} repos={ownerRepos} />
           </Suspense>
           <Suspense fallback={<CloneChart isLoading />}>
-            <OwnerCloneChartWrapper owner={owner} repos={ownerRepos} supabase={supabase} />
+            <OwnerCloneChartWrapper owner={owner} repos={ownerRepos} />
           </Suspense>
           <Suspense fallback={<ReferrersChart isLoading />}>
-            <OwnerReferrersChartWrapper owner={owner} repos={ownerRepos} supabase={supabase} />
+            <OwnerReferrersChartWrapper owner={owner} repos={ownerRepos} />
           </Suspense>
           <Suspense fallback={<PopularContentChart isLoading />}>
-            <OwnerPopularContentChartWrapper owner={owner} repos={ownerRepos} supabase={supabase} />
+            <OwnerPopularContentChartWrapper owner={owner} repos={ownerRepos} />
           </Suspense>
         </div>
       </div>

@@ -1,18 +1,11 @@
 import { getApp } from '@/utils/octokit/app';
-import { createClient } from '@supabase/supabase-js';
+import sql from '@/lib/db';
 
 export async function updateTraffic(installationId: number) {
   const app = getApp();
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
   const octokit = await app.getInstallationOctokit(installationId);
-  app.eachRepository({ installationId }, async ({ repository }) => {
-    // console.log(repository.full_name, 'start')
 
+  app.eachRepository({ installationId }, async ({ repository }) => {
     try {
       const { data: viewsData } = await octokit.request(
         `GET /repos/${repository.full_name}/traffic/views`,
@@ -30,31 +23,21 @@ export async function updateTraffic(installationId: number) {
         `GET /repos/${repository.full_name}/traffic/popular/referrers`,
       );
 
-      const { error: viewsError } = await supabase.from('views').upsert(
-        viewsData.views.map((view: { timestamp: string; count: number; uniques: number }) => ({
-          repo_id: repository.id,
-          date: view.timestamp,
-          total: view.count,
-          unique: view.uniques,
-        })),
-        {
-          onConflict: 'repo_id, date',
-        },
-      );
+      const viewsToUpsert = viewsData.views.map((view: { timestamp: string; count: number; uniques: number }) => ({
+        repo_id: repository.id,
+        date: view.timestamp.split('T')[0],
+        total: view.count,
+        uniques: view.uniques,
+      }));
 
-      const { error: clonesError } = await supabase.from('clones').upsert(
-        clonesData.clones.map((clone: { timestamp: string; count: number; uniques: number }) => ({
-          repo_id: repository.id,
-          date: clone.timestamp,
-          total: clone.count,
-          unique: clone.uniques,
-        })),
-        {
-          onConflict: 'repo_id, date',
-        },
-      );
+      const clonesToUpsert = clonesData.clones.map((clone: { timestamp: string; count: number; uniques: number }) => ({
+        repo_id: repository.id,
+        date: clone.timestamp.split('T')[0],
+        total: clone.count,
+        uniques: clone.uniques,
+      }));
 
-      const pathsMap = new Map<string, { repo_id: number; path: string; total: number; unique: number }>();
+      const pathsMap = new Map<string, { repo_id: number; path: string; total: number; uniques: number }>();
 
       popularPathsData.forEach((path: { path: string; count: number; uniques: number }) => {
         const strippedPath = path.path.replace(/^\/[^/]+\/[^/]+/, '') || '/';
@@ -62,43 +45,62 @@ export async function updateTraffic(installationId: number) {
         if (pathsMap.has(strippedPath)) {
           const existing = pathsMap.get(strippedPath)!;
           existing.total += path.count;
-          existing.unique += path.uniques;
+          existing.uniques += path.uniques;
         } else {
           pathsMap.set(strippedPath, {
             repo_id: repository.id,
             path: strippedPath,
             total: path.count,
-            unique: path.uniques,
+            uniques: path.uniques,
           });
         }
       });
 
-      const pathsData = Array.from(pathsMap.values());
+      const today = new Date().toISOString().split('T')[0];
+      const pathsToUpsert = Array.from(pathsMap.values()).map(p => ({ ...p, date: today }));
 
-      const { error: pathsError } = await supabase.from('paths').upsert(
-        pathsData,
-        {
-          onConflict: 'repo_id, path, date',
-        },
-      );
+      const referrersToUpsert = popularReferrersData.map((referrer: { referrer: string; count: number; uniques: number }) => ({
+        repo_id: repository.id,
+        date: today,
+        referrer: referrer.referrer,
+        total: referrer.count,
+        uniques: referrer.uniques,
+      }));
 
-      // console.log(repository.full_name, pathsData);
+      if (viewsToUpsert.length > 0) {
+        await sql`
+          INSERT INTO views ${sql(viewsToUpsert, 'repo_id', 'date', 'total', 'uniques')}
+          ON CONFLICT (repo_id, date) DO UPDATE SET
+            total = EXCLUDED.total,
+            uniques = EXCLUDED.uniques
+        `;
+      }
 
-      const { error: referrersError } = await supabase.from('referrers').upsert(
-        popularReferrersData.map((referrer: { referrer: string; count: number; uniques: number }) => ({
-          repo_id: repository.id,
-          referrer: referrer.referrer,
-          total: referrer.count,
-          unique: referrer.uniques,
-        })),
-        {
-          onConflict: 'repo_id, referrer, date',
-        },
-      );
+      if (clonesToUpsert.length > 0) {
+        await sql`
+          INSERT INTO clones ${sql(clonesToUpsert, 'repo_id', 'date', 'total', 'uniques')}
+          ON CONFLICT (repo_id, date) DO UPDATE SET
+            total = EXCLUDED.total,
+            uniques = EXCLUDED.uniques
+        `;
+      }
 
-      // console.log(repository.full_name, 'done');
-      if (viewsError || clonesError || pathsError || referrersError) {
-        console.log(viewsError, clonesError, pathsError, referrersError);
+      if (pathsToUpsert.length > 0) {
+        await sql`
+          INSERT INTO paths ${sql(pathsToUpsert, 'repo_id', 'date', 'path', 'total', 'uniques')}
+          ON CONFLICT (repo_id, path, date) DO UPDATE SET
+            total = EXCLUDED.total,
+            uniques = EXCLUDED.uniques
+        `;
+      }
+
+      if (referrersToUpsert.length > 0) {
+        await sql`
+          INSERT INTO referrers ${sql(referrersToUpsert, 'repo_id', 'date', 'referrer', 'total', 'uniques')}
+          ON CONFLICT (repo_id, referrer, date) DO UPDATE SET
+            total = EXCLUDED.total,
+            uniques = EXCLUDED.uniques
+        `;
       }
     } catch (error) {
       console.error(repository.full_name, 'error', error instanceof Error ? error.message : String(error));

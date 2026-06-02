@@ -13,7 +13,13 @@ interface DateRangeContextType {
   dateRange: DateRange;
 }
 
-const DateRangeContext = createContext<DateRangeContextType | undefined>(undefined);
+const defaultContext: DateRangeContextType = {
+  selectedPeriod: "30",
+  setSelectedPeriod: () => {},
+  dateRange: { from: null, to: null },
+};
+
+const DateRangeContext = createContext<DateRangeContextType>(defaultContext);
 
 interface DateRangeProviderProps {
   children: ReactNode;
@@ -33,7 +39,7 @@ function loadFromLocalStorage(fullName: string): string {
   try {
     const key = getStorageKey(fullName);
     const stored = localStorage.getItem(key);
-    return stored || "14";
+    return stored || "30";
   } catch (error) {
     console.error('Error loading date range from localStorage:', error);
     return "14";
@@ -64,7 +70,7 @@ function calculateDateRangeFromPeriod(selectedPeriod: string): DateRange {
 }
 
 export function DateRangeProvider({ children, fullName }: DateRangeProviderProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("14");
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("30");
 
   useEffect(() => {
     const period = loadFromLocalStorage(fullName);
@@ -90,9 +96,5 @@ export function DateRangeProvider({ children, fullName }: DateRangeProviderProps
 }
 
 export function useDateRange() {
-  const context = useContext(DateRangeContext);
-  if (context === undefined) {
-    throw new Error("useDateRange must be used within a DateRangeProvider");
-  }
-  return context;
+  return useContext(DateRangeContext);
 }
