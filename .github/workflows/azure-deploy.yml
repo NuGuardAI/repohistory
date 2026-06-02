@@ -8,8 +8,9 @@ on:
 env:
   AZURE_CONTAINER_APP_NAME: repohistory
   AZURE_RESOURCE_GROUP: repohistory-rg
-  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
-  IMAGE: ${{ secrets.ACR_LOGIN_SERVER }}/repohistory
+  ACR_NAME: repohistoryacr
+  ACR_LOGIN_SERVER: repohistoryacr.azurecr.io
+  IMAGE: repohistoryacr.azurecr.io/repohistory
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -29,7 +30,7 @@ jobs:
 
       # ── Push image to ACR using managed identity (az acr login) ───────────
       - name: Log in to Azure Container Registry
-        run: az acr login --name ${{ secrets.ACR_NAME }}
+        run: az acr login --name ${{ env.ACR_NAME }}
 
       # ── Build & push Docker image ──────────────────────────────────────────
       - name: Set up Docker Buildx
