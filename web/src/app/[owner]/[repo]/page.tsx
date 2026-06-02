@@ -5,7 +5,6 @@ import { StarsChartWrapper, ViewChartWrapper, CloneChartWrapper, ReferrersChartW
 import { Navbar } from "@/components/layout/navbar";
 import { getRepoInfo } from "@/utils/repo/info";
 import { getUserOctokit } from "@/utils/octokit/get-user-octokit";
-import { createClient } from "@/utils/supabase/server";
 import { StarsChart } from "@/components/charts/stars-chart";
 import { ViewChart } from "@/components/charts/view-chart";
 import { CloneChart } from "@/components/charts/clone-chart";
@@ -35,7 +34,6 @@ export default async function RepoPage({ params }: PageProps) {
     return;
   }
 
-  const supabase = await createClient();
   const fullName = `${owner}/${repo}`;
   const octokit = await getUserOctokit();
   const repoInfo = await getRepoInfo(octokit, owner, repo);
@@ -49,16 +47,16 @@ export default async function RepoPage({ params }: PageProps) {
             <StarsChartWrapper fullName={repoInfo.full_name} stargazersCount={repoInfo.stargazers_count} />
           </Suspense>
           <Suspense fallback={<ViewChart isLoading />}>
-            <ViewChartWrapper fullName={fullName} repoId={repoInfo.id} supabase={supabase} />
+            <ViewChartWrapper fullName={fullName} repoId={repoInfo.id} />
           </Suspense>
           <Suspense fallback={<CloneChart isLoading />}>
-            <CloneChartWrapper fullName={fullName} repoId={repoInfo.id} supabase={supabase} />
+            <CloneChartWrapper fullName={fullName} repoId={repoInfo.id} />
           </Suspense>
           <Suspense fallback={<ReferrersChart isLoading />}>
-            <ReferrersChartWrapper fullName={fullName} repoId={repoInfo.id} supabase={supabase} />
+            <ReferrersChartWrapper fullName={fullName} repoId={repoInfo.id} />
           </Suspense>
           <Suspense fallback={<PopularContentChart isLoading />}>
-            <PopularContentChartWrapper fullName={fullName} repoId={repoInfo.id} supabase={supabase} />
+            <PopularContentChartWrapper fullName={fullName} repoId={repoInfo.id} />
           </Suspense>
           <Suspense fallback={<ReleaseChart isLoading />}>
             <ReleaseChartWrapper fullName={fullName} />

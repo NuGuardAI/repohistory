@@ -1,15 +1,13 @@
 import { Octokit } from "octokit";
 import { Repo } from "@/types";
 import { getRepoClones } from "./clones";
-import { createClient } from "@/utils/supabase/server";
 
 export async function getOwnerClones(
   octokit: Octokit,
-  supabase: Awaited<ReturnType<typeof createClient>>,
   repos: Repo[]
 ): Promise<{ count: number; uniques: number; clones: Array<{ timestamp: string; count: number; uniques: number }> }> {
   const repoClonesPromises = repos.map(repo => 
-    getRepoClones(octokit, supabase, repo.full_name, repo.id)
+    getRepoClones(octokit, repo.full_name, repo.id)
   );
 
   const allRepoClones = await Promise.all(repoClonesPromises);

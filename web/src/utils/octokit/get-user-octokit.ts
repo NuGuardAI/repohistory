@@ -1,16 +1,15 @@
 import { Octokit } from "octokit";
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { auth } from '@/lib/auth';
 
 export async function getUserOctokit(): Promise<Octokit> {
-  const cookieStore = await cookies();
-  const providerToken = cookieStore.get('provider_token')?.value;
+  const session = await auth();
 
-  if (!providerToken) {
+  if (!session?.accessToken) {
     redirect('/signin');
   }
 
   return new Octokit({
-    auth: providerToken
+    auth: session.accessToken
   });
 }

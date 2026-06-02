@@ -1,15 +1,13 @@
 import { Octokit } from "octokit";
 import { Repo } from "@/types";
 import { getRepoPaths } from "./paths";
-import { createClient } from "@/utils/supabase/server";
 
 export async function getOwnerPaths(
   octokit: Octokit,
-  supabase: Awaited<ReturnType<typeof createClient>>,
   repos: Repo[]
 ): Promise<{ paths: Array<{ path: string; title: string; data: Array<{ timestamp: string; count: number; uniques: number }> }> }> {
   const repoPathsPromises = repos.map(repo => 
-    getRepoPaths(octokit, supabase, repo.full_name, repo.id)
+    getRepoPaths(octokit, repo.full_name, repo.id)
   );
 
   const allRepoPaths = await Promise.all(repoPathsPromises);

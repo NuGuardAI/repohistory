@@ -1,0 +1,27 @@
+# Dependencies
+**/node_modules
+**/.pnpm-store
+
+# Build artifacts
+**/.next
+**/dist
+**/build
+
+# Git
+.git
+.gitignore
+
+# Local dev
+**/.env.local
+**/.env*.local
+**/docker-compose*.yml
+
+# Misc
+**/*.log
+**/.DS_Store
+**/coverage
+**/.turbo
+
+# Infra (not needed in app image)
+infra/
+landing/

@@ -9,15 +9,18 @@ interface DateRangePickerProps {
 }
 
 const periodOptions = [
+  { value: "1", label: "Last 24 Hours" },
   { value: "7", label: "Last 7 Days" },
-  { value: "14", label: "Last 14 Days" },
-  { value: "28", label: "Last 28 Days" },
-  { value: "91", label: "Last 91 Days" },
+  { value: "30", label: "Last 30 Days" },
   { value: "all", label: "All Time" },
 ];
 
 export function DateRangePicker({ className }: DateRangePickerProps) {
-  const { selectedPeriod, setSelectedPeriod } = useDateRange();
+  const ctx = useDateRange();
+
+  if (!ctx) return null;
+
+  const { selectedPeriod, setSelectedPeriod } = ctx;
 
   const handlePeriodChange = (value: string) => {
     setSelectedPeriod(value);

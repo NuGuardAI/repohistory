@@ -64,7 +64,7 @@ export function Navbar({ repoInfo, ownerInfo }: NavbarProps) {
         )}
       </div>
       <div className="flex items-center gap-2">
-        {(repoInfo || ownerInfo) && <DateRangePicker />}
+        <DateRangePicker />
         {repoInfo && (
           <div className="hidden md:block">
             <DropdownMenu>

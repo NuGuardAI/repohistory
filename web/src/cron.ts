@@ -1,6 +1,8 @@
 import '@/env-config'
-import { app } from '@/utils/octokit/app';
+import { getApp } from '@/utils/octokit/app';
 import { updateTraffic } from './utils/update-traffic';
+
+const app = getApp();
 
 app.eachInstallation(({ installation }) => {
   if (installation.suspended_at) {

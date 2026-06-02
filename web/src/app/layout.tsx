@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { RevalidateOnFocus } from "@/components/layout/revalidate-on-focus";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -72,7 +73,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} dark antialiased`}
       >
         <RevalidateOnFocus />
-        {children}
+        <Providers>
+          {children}
+        </Providers>
         <Toaster />
       </body>
     </html>

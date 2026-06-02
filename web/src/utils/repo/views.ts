@@ -1,33 +1,30 @@
 import { Octokit } from "octokit";
-import { createClient } from "@/utils/supabase/server";
+import { getDb } from "@/lib/db";
 
 export async function getRepoViews(
   octokit: Octokit,
-  supabase: Awaited<ReturnType<typeof createClient>>,
   fullName: string,
   repoId: number
 ): Promise<{ count: number; uniques: number; views: Array<{ timestamp: string; count: number; uniques: number }> }> {
+  const sql = getDb();
   try {
     const [owner, repo] = fullName.split("/");
 
-    // Fetch data from both sources in parallel
-    const [supabaseResult, githubResult] = await Promise.allSettled([
-      supabase
-        .from('views')
-        .select('date, total, unique')
-        .eq('repo_id', repoId)
-        .order('date', { ascending: true }),
-      octokit.rest.repos.getViews({ owner, repo })
+    const [dbResult, githubResult] = await Promise.allSettled([
+      sql<{ date: string; total: number; uniques: number }[]>`
+        SELECT date::text, total, uniques
+        FROM views
+        WHERE repo_id = ${repoId}
+        ORDER BY date ASC
+      `,
+      octokit.request('GET /repos/{owner}/{repo}/traffic/views', { owner, repo })
     ]);
 
-    // Process Supabase data
-    const supabaseData = supabaseResult.status === 'fulfilled' && supabaseResult.value.data || [];
-
-    if (supabaseResult.status === 'rejected') {
-      console.error("Error fetching views from Supabase:", supabaseResult.reason);
+    const dbData = dbResult.status === 'fulfilled' ? dbResult.value : [];
+    if (dbResult.status === 'rejected') {
+      console.error("Error fetching views from DB:", dbResult.reason);
     }
 
-    // Process GitHub data
     const githubData = githubResult.status === 'fulfilled'
       ? githubResult.value.data.views?.map(item => ({
         date: item.timestamp.split('T')[0],
@@ -40,20 +37,17 @@ export async function getRepoViews(
       console.error("Error fetching views from GitHub API:", githubResult.reason);
     }
 
-    // Merge data: GitHub overrides Supabase for matching dates
     const dataMap = new Map(
-      supabaseData.map(item => [
+      dbData.map(item => [
         item.date,
-        { timestamp: item.date, count: item.total || 0, uniques: item.unique || 0 }
+        { timestamp: item.date, count: item.total ?? 0, uniques: item.uniques ?? 0 }
       ])
     );
 
-    // Override with GitHub data (more precise for recent dates)
     githubData.forEach(item => {
       dataMap.set(item.date, { timestamp: item.date, count: item.count, uniques: item.uniques });
     });
 
-    // Fill missing dates with 0 values
     const sortedViews = Array.from(dataMap.values()).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
     const views = [];
 
