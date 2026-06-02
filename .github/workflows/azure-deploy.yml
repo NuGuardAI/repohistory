@@ -48,36 +48,6 @@ jobs:
           cache-from: type=registry,ref=${{ env.IMAGE }}:cache
           cache-to: type=registry,ref=${{ env.IMAGE }}:cache,mode=max
 
-      # ── Run DB schema migration (idempotent — CREATE TABLE IF NOT EXISTS) ──
-      # Opens a temporary firewall rule for this runner, runs psql, then removes it.
-      - name: Run database migrations
-        env:
-          PGPASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
-        run: |
-          RUNNER_IP=$(curl -sf https://api.ipify.org)
-          RULE_NAME="github-runner-${{ github.run_id }}"
-
-          az postgres flexible-server firewall-rule create \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --name repohistory-postgres \
-            --rule-name "$RULE_NAME" \
-            --start-ip-address "$RUNNER_IP" \
-            --end-ip-address "$RUNNER_IP"
-
-          psql \
-            "host=repohistory-postgres.postgres.database.azure.com \
-             port=5432 \
-             dbname=repohistory \
-             user=${{ secrets.POSTGRES_ADMIN_USER }} \
-             sslmode=require" \
-            -f web/db/schema.sql
-
-          az postgres flexible-server firewall-rule delete \
-            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --name repohistory-postgres \
-            --rule-name "$RULE_NAME" \
-            --yes
-
       # ── Deploy updated image to Container Apps ─────────────────────────────
       - name: Deploy to Azure Container Apps
         run: |

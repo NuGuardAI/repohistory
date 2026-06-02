@@ -15,6 +15,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY web/ .
 
+ARG NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+
+# Dummy DATABASE_URL so page-data collection doesn't throw during build.
+# The real value is injected at runtime via Container Apps secrets.
+ENV DATABASE_URL=postgres://build:build@localhost:5432/build
+
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 

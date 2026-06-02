@@ -1,6 +1,7 @@
 // Azure infrastructure for Repohistory
-// Resources: Container Registry, PostgreSQL Flexible Server, Container Apps Environment + App, Log Analytics, Managed Identity
-// Estimated cost: ~$19-24/mo  (ACR Basic ~$5 + PostgreSQL B1ms ~$12 + Container Apps consumption ~$0-5 + Log Analytics ~$2)
+// Resources: Container Registry, PostgreSQL container (Azure Files), Container Apps Environment + App, Log Analytics, Managed Identity
+// Estimated cost: ~$10-15/mo  (ACR Basic ~$5 + Azure Files ~$1 + Container Apps consumption ~$2-7 + Log Analytics ~$2)
+// Note: Uses postgres:16-alpine container instead of Flexible Server to avoid subscription quota restrictions.
 
 param location string = 'eastus'
 param appName string = 'repohistory'
@@ -60,44 +61,21 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-// ── PostgreSQL Flexible Server ────────────────────────────────────────────────
-resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview' = {
-  name: '${appName}-postgres'
+// ── Storage Account + Azure Files (PostgreSQL data persistence) ──────────────
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: '${replace(appName, '-', '')}pgdata'
   location: location
-  sku: {
-    name: 'Standard_B1ms'
-    tier: 'Burstable'
-  }
+  sku: { name: 'Standard_LRS' }
+  kind: 'StorageV2'
   properties: {
-    administratorLogin: postgresAdminUser
-    administratorLoginPassword: postgresAdminPassword
-    storage: {
-      storageSizeGB: 32
-    }
-    backup: {
-      backupRetentionDays: 7
-      geoRedundantBackup: 'Disabled'
-    }
-    version: '16'
-    highAvailability: {
-      mode: 'Disabled'
-    }
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
   }
 }
 
-resource postgresDb 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-06-01-preview' = {
-  parent: postgres
-  name: 'repohistory'
-}
-
-// Allow all Azure-internal traffic (covers Container Apps egress)
-resource postgresFirewallAllowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
-  parent: postgres
-  name: 'AllowAzureServices'
-  properties: {
-    startIpAddress: '0.0.0.0'
-    endIpAddress: '0.0.0.0'
-  }
+resource filesShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-01-01' = {
+  name: '${storageAccount.name}/default/postgres-data'
+  properties: { shareQuota: 5 }
 }
 
 // ── Log Analytics ─────────────────────────────────────────────────────────────
@@ -113,6 +91,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
 }
 
 // ── Container Apps Environment ────────────────────────────────────────────────
+// caEnv must be declared before caStorage (which is a child resource)
 resource caEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: '${appName}-env'
   location: location
@@ -127,8 +106,80 @@ resource caEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
   }
 }
 
+// ── Azure Files binding in Container Apps environment ───────────────────────
+resource caStorage 'Microsoft.App/managedEnvironments/storages@2024-03-01' = {
+  parent: caEnv
+  name: 'postgres-storage'
+  properties: {
+    azureFile: {
+      accountName: storageAccount.name
+      accountKey: storageAccount.listKeys().keys[0].value
+      shareName: 'postgres-data'
+      accessMode: 'ReadWrite'
+    }
+  }
+  dependsOn: [filesShare]
+}
+
+// ── PostgreSQL container (internal TCP, single replica, persistent volume) ───
+resource postgresApp 'Microsoft.App/containerApps@2024-03-01' = {
+  name: 'postgres'
+  location: location
+  properties: {
+    environmentId: caEnv.id
+    configuration: {
+      ingress: {
+        external: false
+        transport: 'tcp'
+        targetPort: 5432
+        exposedPort: 5432
+      }
+      secrets: [
+        { name: 'postgres-password', value: postgresAdminPassword }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'postgres'
+          image: 'postgres:16-alpine'
+          resources: {
+            cpu: json('0.25')
+            memory: '0.5Gi'
+          }
+          env: [
+            { name: 'POSTGRES_DB', value: 'repohistory' }
+            { name: 'POSTGRES_USER', value: postgresAdminUser }
+            { name: 'POSTGRES_PASSWORD', secretRef: 'postgres-password' }
+            { name: 'PGDATA', value: '/var/lib/postgresql/data/pgdata' }
+          ]
+          volumeMounts: [
+            {
+              volumeName: 'postgres-data'
+              mountPath: '/var/lib/postgresql/data'
+            }
+          ]
+        }
+      ]
+      volumes: [
+        {
+          name: 'postgres-data'
+          storageType: 'AzureFile'
+          storageName: 'postgres-storage'
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
+      }
+    }
+  }
+  dependsOn: [caStorage]
+}
+
 // ── Container App ─────────────────────────────────────────────────────────────
-var databaseUrl = 'postgres://${postgresAdminUser}:${postgresAdminPassword}@${postgres.properties.fullyQualifiedDomainName}:5432/repohistory?sslmode=require'
+// postgres app name is its internal DNS hostname within the same CA environment
+var databaseUrl = 'postgres://${postgresAdminUser}:${postgresAdminPassword}@postgres:5432/repohistory'
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: appName
@@ -161,8 +212,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         { name: 'auth-secret', value: authSecret }
         { name: 'github-client-id', value: githubClientId }
         { name: 'github-client-secret', value: githubClientSecret }
-        { name: 'app-id', value: appId }
-        { name: 'app-private-key', value: appPrivateKey }
+        { name: 'app-id', value: empty(appId) ? 'not-configured' : appId }
+        { name: 'app-private-key', value: empty(appPrivateKey) ? 'not-configured' : appPrivateKey }
       ]
     }
     template: {
@@ -176,6 +227,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             { name: 'DATABASE_URL', secretRef: 'database-url' }
+            { name: 'DATABASE_SSL', value: 'false' }
             { name: 'NEXTAUTH_SECRET', secretRef: 'auth-secret' }
             { name: 'AUTH_SECRET', secretRef: 'auth-secret' }
             { name: 'GITHUB_CLIENT_ID', secretRef: 'github-client-id' }
@@ -205,11 +257,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     }
   }
   // Role assignment must exist before Container App tries to pull from ACR
-  dependsOn: [acrPullRole]
+  // postgres must be running before the web app starts
+  dependsOn: [acrPullRole, postgresApp]
 }
 
 // ── Outputs ───────────────────────────────────────────────────────────────────
 output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
 output acrLoginServer string = acr.properties.loginServer
-output postgresHost string = postgres.properties.fullyQualifiedDomainName
+output postgresInternalHost string = 'postgres'
 output identityClientId string = identity.properties.clientId

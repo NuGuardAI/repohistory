@@ -1,11 +1,12 @@
 import { Octokit } from "octokit";
-import sql from "@/lib/db";
+import { getDb } from "@/lib/db";
 
 export async function getRepoViews(
   octokit: Octokit,
   fullName: string,
   repoId: number
 ): Promise<{ count: number; uniques: number; views: Array<{ timestamp: string; count: number; uniques: number }> }> {
+  const sql = getDb();
   try {
     const [owner, repo] = fullName.split("/");
 

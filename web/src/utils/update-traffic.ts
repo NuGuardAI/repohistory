@@ -1,7 +1,8 @@
 import { getApp } from '@/utils/octokit/app';
-import sql from '@/lib/db';
+import { getDb } from '@/lib/db';
 
 export async function updateTraffic(installationId: number) {
+  const sql = getDb();
   const app = getApp();
   const octokit = await app.getInstallationOctokit(installationId);
 

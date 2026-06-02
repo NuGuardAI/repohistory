@@ -4,7 +4,8 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
-  const { default: sql } = await import('./lib/db');
+  const { getDb } = await import('./lib/db');
+  const sql = getDb();
 
   try {
     await sql`
