@@ -2,25 +2,39 @@ import { Repo } from "@/types";
 import { Octokit } from "octokit";
 import { getApp } from "./app";
 
-const DEV_FALLBACK_REPO = 'NuGuardAI/nuguard';
-
 export async function getRepos(_octokit: Octokit) {
-  if (!process.env.APP_ID) {
-    const [owner, repo] = DEV_FALLBACK_REPO.split('/');
-    // Use env PAT directly — avoids any JWT encode/decode corruption of the token.
-    const devOctokit = new Octokit({ auth: process.env.GITHUB_PERSONAL_ACCESS_TOKEN });
-    const { data } = await devOctokit.request('GET /repos/{owner}/{repo}', { owner, repo });
-    const devRepo: Repo = {
-      id: data.id,
-      name: data.name,
-      full_name: data.full_name,
-      stargazers_count: data.stargazers_count,
-      description: data.description,
-    };
+  // Use GitHub App path only when a real APP_ID is configured
+  const hasApp = process.env.APP_ID && process.env.APP_ID !== 'not-configured';
+
+  if (!hasApp) {
+    // No GitHub App configured — list repos via the user's OAuth token
+    const { data: userRepos } = await _octokit.request('GET /user/repos', {
+      per_page: 100,
+      sort: 'updated',
+      affiliation: 'owner,organization_member',
+    });
+
+    const repos: Repo[] = userRepos
+      .filter(r => r.permissions?.push || r.permissions?.admin)
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        full_name: r.full_name,
+        stargazers_count: r.stargazers_count,
+        description: r.description ?? null,
+      }));
+
+    const reposByOwner: Record<string, Repo[]> = {};
+    for (const repo of repos) {
+      const owner = repo.full_name.split('/')[0];
+      if (!reposByOwner[owner]) reposByOwner[owner] = [];
+      reposByOwner[owner].push(repo);
+    }
+
     return {
-      repos: [devRepo],
-      reposByOwner: { [owner]: [devRepo] },
-      shouldShowOwnerView: false,
+      repos,
+      reposByOwner,
+      shouldShowOwnerView: Object.keys(reposByOwner).length > 1,
     };
   }
 
