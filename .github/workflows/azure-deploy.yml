@@ -50,10 +50,30 @@ jobs:
           cache-from: type=registry,ref=${{ env.IMAGE }}:cache
           cache-to: type=registry,ref=${{ env.IMAGE }}:cache,mode=max
 
+      # ── Register NuGuard integration secrets ──────────────────────────────
+      # Idempotent: sets Cloudflare + GA4 secrets on every deploy.
+      # If the GitHub secret is empty the Container App secret is set to an
+      # empty string, which is harmless — the cron fetchers skip gracefully.
+      - name: Set NuGuard secrets on Container App
+        run: |
+          az containerapp secret set \
+            --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --secrets \
+              "cloudflare-api-token=${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+              "cloudflare-zone-id=${{ secrets.CLOUDFLARE_ZONE_ID }}" \
+              "ga4-property-id=${{ secrets.GA4_PROPERTY_ID }}" \
+              "ga4-service-account-json=${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}"
+
       # ── Deploy updated image to Container Apps ─────────────────────────────
       - name: Deploy to Azure Container Apps
         run: |
           az containerapp update \
             --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --image ${{ env.IMAGE }}:${{ github.sha }}
+            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --set-env-vars \
+              "CLOUDFLARE_API_TOKEN=secretref:cloudflare-api-token" \
+              "CLOUDFLARE_ZONE_ID=secretref:cloudflare-zone-id" \
+              "GA4_PROPERTY_ID=secretref:ga4-property-id" \
+              "GA4_SERVICE_ACCOUNT_JSON=secretref:ga4-service-account-json"

@@ -25,6 +25,20 @@ param appId string
 @secure()
 param appPrivateKey string
 
+// Optional: Cloudflare + Google Analytics 4 credentials for nuguard.ai analytics.
+// Leave empty on first deploy; set once credentials are available.
+@secure()
+param cloudflareApiToken string = ''
+
+@secure()
+param cloudflareZoneId string = ''
+
+@secure()
+param ga4PropertyId string = ''
+
+@secure()
+param ga4ServiceAccountJson string = ''
+
 // Set to placeholder on first deploy; update once FQDN is known
 param siteUrl string = 'https://placeholder.azurecontainerapps.io'
 
@@ -187,6 +201,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         { name: 'github-client-secret', value: githubClientSecret }
         { name: 'app-id', value: empty(appId) ? 'not-configured' : appId }
         { name: 'app-private-key', value: empty(appPrivateKey) ? 'not-configured' : appPrivateKey }
+        { name: 'cloudflare-api-token', value: cloudflareApiToken }
+        { name: 'cloudflare-zone-id', value: cloudflareZoneId }
+        { name: 'ga4-property-id', value: ga4PropertyId }
+        { name: 'ga4-service-account-json', value: ga4ServiceAccountJson }
       ]
     }
     template: {
@@ -207,6 +225,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'GITHUB_CLIENT_SECRET', secretRef: 'github-client-secret' }
             { name: 'APP_ID', secretRef: 'app-id' }
             { name: 'APP_PRIVATE_KEY', secretRef: 'app-private-key' }
+            { name: 'CLOUDFLARE_API_TOKEN', secretRef: 'cloudflare-api-token' }
+            { name: 'CLOUDFLARE_ZONE_ID', secretRef: 'cloudflare-zone-id' }
+            { name: 'GA4_PROPERTY_ID', secretRef: 'ga4-property-id' }
+            { name: 'GA4_SERVICE_ACCOUNT_JSON', secretRef: 'ga4-service-account-json' }
             { name: 'NEXTAUTH_URL', value: siteUrl }
             { name: 'NEXT_PUBLIC_SITE_URL', value: siteUrl }
             { name: 'NODE_ENV', value: 'production' }
