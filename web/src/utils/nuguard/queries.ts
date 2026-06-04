@@ -165,6 +165,66 @@ export async function getNuguardDemographics(
   return rows;
 }
 
+const NUGUARD_REPO_ID = 1186790942;
+
+export interface NuguardRepoStats {
+  views: {
+    count: number;
+    uniques: number;
+    views: Array<{ timestamp: string; count: number; uniques: number }>;
+  };
+  clones: {
+    count: number;
+    uniques: number;
+    clones: Array<{ timestamp: string; count: number; uniques: number }>;
+  };
+}
+
+export async function getNuguardRepoStats(dateRange: DateRange): Promise<NuguardRepoStats> {
+  const sql = getDb();
+  const filter = dateFilter(dateRange.from, dateRange.to);
+
+  const [viewRows, cloneRows] = await Promise.all([
+    filter
+      ? sql<Array<{ date: string; total: number; uniques: number }>>`
+          SELECT date::text, total, uniques FROM views
+          WHERE repo_id = ${NUGUARD_REPO_ID}
+            AND date >= ${filter.since} AND date <= ${filter.until}
+          ORDER BY date ASC
+        `
+      : sql<Array<{ date: string; total: number; uniques: number }>>`
+          SELECT date::text, total, uniques FROM views
+          WHERE repo_id = ${NUGUARD_REPO_ID}
+          ORDER BY date ASC
+        `,
+    filter
+      ? sql<Array<{ date: string; total: number; uniques: number }>>`
+          SELECT date::text, total, uniques FROM clones
+          WHERE repo_id = ${NUGUARD_REPO_ID}
+            AND date >= ${filter.since} AND date <= ${filter.until}
+          ORDER BY date ASC
+        `
+      : sql<Array<{ date: string; total: number; uniques: number }>>`
+          SELECT date::text, total, uniques FROM clones
+          WHERE repo_id = ${NUGUARD_REPO_ID}
+          ORDER BY date ASC
+        `,
+  ]);
+
+  return {
+    views: {
+      count: viewRows.reduce((s, r) => s + r.total, 0),
+      uniques: viewRows.reduce((s, r) => s + r.uniques, 0),
+      views: viewRows.map(r => ({ timestamp: r.date, count: r.total, uniques: r.uniques })),
+    },
+    clones: {
+      count: cloneRows.reduce((s, r) => s + r.total, 0),
+      uniques: cloneRows.reduce((s, r) => s + r.uniques, 0),
+      clones: cloneRows.map(r => ({ timestamp: r.date, count: r.total, uniques: r.uniques })),
+    },
+  };
+}
+
 export async function getNuguardSources(dateRange: DateRange): Promise<NuguardSource[]> {
   const sql = getDb();
   const filter = dateFilter(dateRange.from, dateRange.to);
