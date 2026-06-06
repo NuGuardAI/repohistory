@@ -124,6 +124,13 @@ export async function register() {
       )
     `;
     console.log('[instrumentation] DB schema applied');
+    console.log('[instrumentation] env check:', {
+      DATABASE_URL: !!process.env.DATABASE_URL,
+      GITHUB_CLIENT_ID: !!process.env.GITHUB_CLIENT_ID,
+      AUTH_SECRET: !!(process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET),
+      APP_ID: !!process.env.APP_ID,
+      APP_PRIVATE_KEY: !!process.env.APP_PRIVATE_KEY,
+    });
   } catch (err) {
     console.error('[instrumentation] DB schema error:', err);
   }

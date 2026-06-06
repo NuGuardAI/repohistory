@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://repohistory.blacksmoke-efb72e6e.eastus.azurecontainerapps.io'),
   title: "Repohistory",
   description: "A open-source analytics platform for tracking GitHub repo traffic history longer than 14 days.",
 };
