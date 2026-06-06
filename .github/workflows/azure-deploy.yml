@@ -66,6 +66,14 @@ jobs:
               "ga4-service-account-json=${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}"
 
       # ── Deploy updated image to Container Apps ─────────────────────────────
+      - name: Set local auth secrets on Container App
+        run: |
+          az containerapp secret set \
+            --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --secrets \
+              "local-auth-github-token=${{ secrets.LOCAL_AUTH_GITHUB_TOKEN }}"
+
       - name: Deploy to Azure Container Apps
         run: |
           az containerapp update \
@@ -76,4 +84,6 @@ jobs:
               "CLOUDFLARE_API_TOKEN=secretref:cloudflare-api-token" \
               "CLOUDFLARE_ZONE_ID=secretref:cloudflare-zone-id" \
               "GA4_PROPERTY_ID=secretref:ga4-property-id" \
-              "GA4_SERVICE_ACCOUNT_JSON=secretref:ga4-service-account-json"
+              "GA4_SERVICE_ACCOUNT_JSON=secretref:ga4-service-account-json" \
+              "ADMIN_GITHUB_LOGINS=${{ secrets.ADMIN_GITHUB_LOGINS }}" \
+              "LOCAL_AUTH_GITHUB_TOKEN=secretref:local-auth-github-token"
