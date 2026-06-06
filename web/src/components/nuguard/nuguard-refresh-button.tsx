@@ -13,12 +13,12 @@ export function NuguardRefreshButton() {
 
   function handleRefresh() {
     startTransition(async () => {
-      try {
-        await syncData()
+      const result = await syncData()
+      if (result.ok) {
         router.refresh()
-        toast.success('Data refreshed successfully')
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to refresh data')
+        toast.success(result.message)
+      } else {
+        toast.error(result.message)
       }
     })
   }
