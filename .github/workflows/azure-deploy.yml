@@ -54,7 +54,7 @@ jobs:
       # Idempotent: sets Cloudflare + GA4 secrets on every deploy.
       # If the GitHub secret is empty the Container App secret is set to an
       # empty string, which is harmless — the cron fetchers skip gracefully.
-      - name: Set NuGuard secrets on Container App
+      - name: Set NuGuard and cron secrets on Container App
         run: |
           az containerapp secret set \
             --name ${{ env.AZURE_CONTAINER_APP_NAME }} \
@@ -63,7 +63,8 @@ jobs:
               "cloudflare-api-token=${{ secrets.CLOUDFLARE_API_TOKEN }}" \
               "cloudflare-zone-id=${{ secrets.CLOUDFLARE_ZONE_ID }}" \
               "ga4-property-id=${{ secrets.GA4_PROPERTY_ID }}" \
-              "ga4-service-account-json=${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}"
+              "ga4-service-account-json=${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}" \
+              "cron-secret=${{ secrets.CRON_SECRET }}"
 
       # ── Deploy updated image to Container Apps ─────────────────────────────
       - name: Set local auth secrets on Container App
@@ -85,5 +86,7 @@ jobs:
               "CLOUDFLARE_ZONE_ID=secretref:cloudflare-zone-id" \
               "GA4_PROPERTY_ID=secretref:ga4-property-id" \
               "GA4_SERVICE_ACCOUNT_JSON=secretref:ga4-service-account-json" \
+              "CRON_SECRET=secretref:cron-secret" \
+              "PINNED_REPO=NuGuardAI/nuguard" \
               "ADMIN_GITHUB_LOGINS=${{ secrets.ADMIN_GITHUB_LOGINS }}" \
               "LOCAL_AUTH_GITHUB_TOKEN=secretref:local-auth-github-token"

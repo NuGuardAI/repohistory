@@ -15,7 +15,7 @@ async function getReposViaOAuth(octokit: Octokit): Promise<RepoResult> {
     affiliation: 'owner,organization_member',
   });
 
-  const repos: Repo[] = userRepos
+  const allRepos: Repo[] = userRepos
     .filter(r => r.permissions?.push || r.permissions?.admin)
     .map(r => ({
       id: r.id,
@@ -24,6 +24,8 @@ async function getReposViaOAuth(octokit: Octokit): Promise<RepoResult> {
       stargazers_count: r.stargazers_count,
       description: r.description ?? null,
     }));
+
+  const repos = filterPinned(allRepos);
 
   const reposByOwner: Record<string, Repo[]> = {};
   for (const repo of repos) {
@@ -37,6 +39,12 @@ async function getReposViaOAuth(octokit: Octokit): Promise<RepoResult> {
     reposByOwner,
     shouldShowOwnerView: Object.keys(reposByOwner).length > 1,
   };
+}
+
+const PINNED_REPO = process.env.PINNED_REPO;
+
+function filterPinned(repos: Repo[]): Repo[] {
+  return PINNED_REPO ? repos.filter(r => r.full_name === PINNED_REPO) : repos;
 }
 
 export async function getRepos(octokit: Octokit): Promise<RepoResult> {
@@ -71,10 +79,18 @@ export async function getRepos(octokit: Octokit): Promise<RepoResult> {
       }
     }));
 
+    const filteredRepos = filterPinned(repos);
+    const filteredByOwner: Record<string, Repo[]> = {};
+    for (const repo of filteredRepos) {
+      const owner = repo.full_name.split('/')[0];
+      if (!filteredByOwner[owner]) filteredByOwner[owner] = [];
+      filteredByOwner[owner].push(repo);
+    }
+
     return {
-      repos,
-      reposByOwner,
-      shouldShowOwnerView: Object.values(reposByOwner).some(ownerRepos => ownerRepos.length > 1),
+      repos: filteredRepos,
+      reposByOwner: filteredByOwner,
+      shouldShowOwnerView: Object.values(filteredByOwner).some(ownerRepos => ownerRepos.length > 1),
     };
   } catch (err) {
     console.warn('[get-repos] GitHub App path failed, falling back to OAuth:', err instanceof Error ? err.message : err);

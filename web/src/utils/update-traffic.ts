@@ -1,12 +1,13 @@
 import { getApp } from '@/utils/octokit/app';
 import { getDb } from '@/lib/db';
 
-export async function updateTraffic(installationId: number) {
+export async function updateTraffic(installationId: number, repoFilter?: string) {
   const sql = getDb();
   const app = getApp();
   const octokit = await app.getInstallationOctokit(installationId);
 
   app.eachRepository({ installationId }, async ({ repository }) => {
+    if (repoFilter && repository.full_name !== repoFilter) return;
     try {
       const { data: viewsData } = await octokit.request(
         `GET /repos/${repository.full_name}/traffic/views`,
