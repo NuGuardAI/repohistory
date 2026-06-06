@@ -1,18 +1,21 @@
 'use client'
 
 import { useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { syncData } from '@/actions/sync'
 
 export function NuguardRefreshButton() {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   function handleRefresh() {
     startTransition(async () => {
       try {
         await syncData()
+        router.refresh()
         toast.success('Data refreshed successfully')
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to refresh data')
