@@ -13,10 +13,14 @@ import { NuguardSourcesTable } from '@/components/nuguard/nuguard-sources-table'
 import { NuguardDemographics } from '@/components/nuguard/nuguard-demographics';
 import { NuguardJourneySection } from '@/components/nuguard/nuguard-journey-section';
 import { NuguardGithubStats } from '@/components/nuguard/nuguard-github-stats';
+import { NuguardRefreshButton } from '@/components/nuguard/nuguard-refresh-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Suspense } from 'react';
+import { auth } from '@/lib/auth';
 
 async function NuguardContent() {
+  const session = await auth();
+  const isAdmin = session?.isAdmin ?? false;
   const dateRange = { from: null, to: null };
 
   const [traffic, users, pages, countries, ages, genders, sources, repoStats] = await Promise.allSettled([
@@ -44,9 +48,12 @@ async function NuguardContent() {
 
   return (
     <div className="flex flex-col gap-6 px-4 sm:px-10 py-6">
-      <div>
-        <h1 className="text-2xl font-bold">NuGuard Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-1">nuguard.ai — website and GitHub repository stats</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">NuGuard Analytics</h1>
+          <p className="text-sm text-muted-foreground mt-1">nuguard.ai — website and GitHub repository stats</p>
+        </div>
+        {isAdmin && <NuguardRefreshButton />}
       </div>
 
       <Tabs defaultValue="website">
