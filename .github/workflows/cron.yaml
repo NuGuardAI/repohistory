@@ -20,6 +20,23 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ./web/package.json
+          run_install: |
+            - cwd: ./web
+
+      # GitHub traffic update: runs on the runner using GHA secrets for GitHub App
+      # credentials, then writes to the DB via the DATABASE_URL fetched from Azure.
+      # NOTE: the DATABASE_URL hostname 'postgres' only resolves inside the
+      # Container Apps environment, so this step will be unable to write to the DB.
+      # A future improvement is to move this to an in-container API route too.
       - name: Fetch DATABASE_URL from Container App
         run: |
           DB=$(az containerapp secret show \
@@ -29,25 +46,22 @@ jobs:
             --query "value" -o tsv)
           echo "DATABASE_URL=$DB" >> $GITHUB_ENV
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          package_json_file: ./web/package.json
-          run_install: |
-            - cwd: ./web
-
-      - name: Run the script
+      - name: Run GitHub traffic update
         env:
           APP_ID: ${{ secrets.APP_ID }}
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
-          GA4_SERVICE_ACCOUNT_JSON: ${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}
         working-directory: ./web
-        run: pnpm tsx src/cron.ts
+        run: pnpm tsx src/cron-traffic.ts
+
+      # NuGuard stats update: runs inside the Container App where the internal
+      # 'postgres' hostname resolves, via an authenticated API route.
+      - name: Trigger NuGuard stats update via Container App
+        run: |
+          SITE_URL=$(az containerapp show \
+            --name repohistory \
+            --resource-group repohistory-rg \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          RESPONSE=$(curl -sf -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "https://${SITE_URL}/api/cron/nuguard")
+          echo "NuGuard update response: $RESPONSE"
