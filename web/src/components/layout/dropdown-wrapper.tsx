@@ -14,11 +14,12 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, MessageSquare, Bug, Lightbulb } from "lucide-react";
+import { LogOut, Settings, MessageSquare, Bug, Lightbulb, Users } from "lucide-react";
 
 export function DropdownWrapper() {
   const { data: session } = useSession();
   const user = session?.user;
+  const isAdmin = session?.isAdmin;
 
   return (
     <DropdownMenu>
@@ -31,6 +32,17 @@ export function DropdownWrapper() {
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {isAdmin && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/users">
+                <Users className="mr-2 h-4 w-4" />
+                Manage Users
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem asChild>
           <a
             href="https://github.com/apps/repohistory/installations/new"
