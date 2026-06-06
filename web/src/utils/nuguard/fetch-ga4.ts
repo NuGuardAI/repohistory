@@ -27,13 +27,12 @@ function getDimValue(row: { dimensionValues?: Array<{ value?: string | null }> |
   return row.dimensionValues?.[index]?.value ?? '';
 }
 
-export async function fetchGA4(): Promise<void> {
+export async function fetchGA4(): Promise<boolean> {
   const propertyId = process.env.GA4_PROPERTY_ID;
   const encoded = process.env.GA4_SERVICE_ACCOUNT_JSON;
 
   if (!propertyId || !encoded) {
-    console.log('GA4 env vars not set, skipping nuguard GA4 fetch');
-    return;
+    return false;
   }
 
   const client = getClient();
@@ -221,4 +220,5 @@ export async function fetchGA4(): Promise<void> {
   } else {
     console.error('GA4 sources report failed:', sourcesRes.reason);
   }
+  return true;
 }

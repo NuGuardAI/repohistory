@@ -21,6 +21,11 @@ export async function syncData() {
     console.warn('[sync] Skipping GitHub traffic — GitHub App not configured:', err instanceof Error ? err.message : err)
   }
 
-  await updateNuguardStats()
+  const result = await updateNuguardStats()
+
+  if (!result.cloudflare && !result.ga4) {
+    throw new Error('Cloudflare and GA4 credentials are not configured — nothing was synced')
+  }
+
   revalidatePath('/nuguard')
 }

@@ -38,13 +38,12 @@ function lastNDays(n: number): { since: string; until: string } {
   };
 }
 
-export async function fetchCloudflare(): Promise<void> {
+export async function fetchCloudflare(): Promise<boolean> {
   const token = process.env.CLOUDFLARE_API_TOKEN;
   const zoneId = process.env.CLOUDFLARE_ZONE_ID;
 
   if (!token || !zoneId) {
-    console.log('Cloudflare env vars not set, skipping nuguard CF fetch');
-    return;
+    return false;
   }
 
   const sql = getDb();
@@ -97,7 +96,7 @@ export async function fetchCloudflare(): Promise<void> {
   }
 
   const zone = body.data?.viewer?.zones?.[0];
-  if (!zone) return;
+  if (!zone) return false;
 
   const dailyRows = (zone.httpRequests1dGroups ?? []).map(node => ({
     date: node.date,
@@ -135,4 +134,5 @@ export async function fetchCloudflare(): Promise<void> {
   }
 
   console.log(`Cloudflare: upserted ${dailyRows.length} daily rows, ${countryRows.length} country rows`);
+  return true;
 }
