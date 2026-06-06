@@ -2,10 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { GitHub } from "@/components/icons";
-import { signin } from "@/actions/auth";
 
 import { useState } from "react";
 import { Loader } from "lucide-react";
+import { signIn } from "next-auth/react";
 
 export default function SignInButton() {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,7 +17,10 @@ export default function SignInButton() {
       <Button
         onClick={() => {
           setIsLoading(true);
-          signin();
+          void signIn("github", { callbackUrl: "/" }).catch(error => {
+            console.error("GitHub sign-in failed", error);
+            setIsLoading(false);
+          });
         }}>
         {isLoading ? <Loader className="animate-spin" /> : <GitHub />}
         Continue with GitHub
@@ -25,23 +28,12 @@ export default function SignInButton() {
       {isDev && (
         <Button
           variant="outline"
-          onClick={async () => {
+          onClick={() => {
             setIsDevLoading(true);
-            // Fetch CSRF token then submit a real form POST so the browser
-            // sends the __Host-next-auth.csrf-token cookie correctly.
-            const { csrfToken } = await fetch('/api/auth/csrf').then(r => r.json());
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/api/auth/signin/dev-login';
-            for (const [name, value] of Object.entries({ csrfToken, callbackUrl: '/' })) {
-              const input = document.createElement('input');
-              input.type = 'hidden';
-              input.name = name;
-              input.value = value as string;
-              form.appendChild(input);
-            }
-            document.body.appendChild(form);
-            form.submit();
+            void signIn("dev-login", { callbackUrl: "/" }).catch(error => {
+              console.error("Dev sign-in failed", error);
+              setIsDevLoading(false);
+            });
           }}>
           {isDevLoading ? <Loader className="animate-spin" /> : null}
           Dev Login (local only)

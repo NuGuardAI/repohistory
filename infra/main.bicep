@@ -25,6 +25,13 @@ param appId string
 @secure()
 param appPrivateKey string
 
+// Local auth: comma-separated GitHub logins that are admins (e.g. 'alice,bob')
+param adminGithubLogins string = ''
+
+// Local auth: GitHub token used by local (username/password) users for API calls
+@secure()
+param localAuthGithubToken string = ''
+
 // Optional: Cloudflare + Google Analytics 4 credentials for nuguard.ai analytics.
 // Leave empty on first deploy; set once credentials are available.
 @secure()
@@ -201,6 +208,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         { name: 'github-client-secret', value: githubClientSecret }
         { name: 'app-id', value: empty(appId) ? 'not-configured' : appId }
         { name: 'app-private-key', value: empty(appPrivateKey) ? 'not-configured' : appPrivateKey }
+        { name: 'local-auth-github-token', value: empty(localAuthGithubToken) ? 'not-configured' : localAuthGithubToken }
         { name: 'cloudflare-api-token', value: cloudflareApiToken }
         { name: 'cloudflare-zone-id', value: cloudflareZoneId }
         { name: 'ga4-property-id', value: ga4PropertyId }
@@ -225,6 +233,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'GITHUB_CLIENT_SECRET', secretRef: 'github-client-secret' }
             { name: 'APP_ID', secretRef: 'app-id' }
             { name: 'APP_PRIVATE_KEY', secretRef: 'app-private-key' }
+            { name: 'ADMIN_GITHUB_LOGINS', value: adminGithubLogins }
+            { name: 'LOCAL_AUTH_GITHUB_TOKEN', secretRef: 'local-auth-github-token' }
             { name: 'CLOUDFLARE_API_TOKEN', secretRef: 'cloudflare-api-token' }
             { name: 'CLOUDFLARE_ZONE_ID', secretRef: 'cloudflare-zone-id' }
             { name: 'GA4_PROPERTY_ID', secretRef: 'ga4-property-id' }

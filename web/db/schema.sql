@@ -35,3 +35,12 @@ CREATE TABLE IF NOT EXISTS referrers (
   uniques   INTEGER NOT NULL DEFAULT 0,
   UNIQUE (repo_id, referrer, date)
 );
+
+CREATE TABLE IF NOT EXISTS local_users (
+  id            BIGSERIAL PRIMARY KEY,
+  username      TEXT        NOT NULL UNIQUE,
+  password_hash TEXT        NOT NULL,
+  created_by    TEXT        NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

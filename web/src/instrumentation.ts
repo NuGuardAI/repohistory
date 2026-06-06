@@ -113,6 +113,16 @@ export async function register() {
         UNIQUE (date, source, medium)
       )
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS local_users (
+        id            BIGSERIAL PRIMARY KEY,
+        username      TEXT        NOT NULL UNIQUE,
+        password_hash TEXT        NOT NULL,
+        created_by    TEXT        NOT NULL,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
     console.log('[instrumentation] DB schema applied');
   } catch (err) {
     console.error('[instrumentation] DB schema error:', err);

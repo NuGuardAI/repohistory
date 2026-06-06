@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  allowedDevOrigins: [
+    '127.0.0.1',
+    '*.app.github.dev',
+    '*.azurecontainerapps.io',
+  ],
   // Keep postgres.js and native-module packages out of the webpack bundle.
   // instrumentation.ts is compiled for both Node.js and Edge runtimes — the
   // webpack externals below prevent build errors from Node.js-only packages.

@@ -4,6 +4,7 @@ import {
   getNuguardTopPages,
   getNuguardDemographics,
   getNuguardSources,
+  getNuguardRepoStats,
 } from '@/utils/nuguard/queries';
 import { NuguardStatsCards, NuguardStatsCardsSkeleton } from '@/components/nuguard/nuguard-stats-cards';
 import { NuguardTrafficChart } from '@/components/nuguard/nuguard-traffic-chart';
@@ -11,12 +12,14 @@ import { NuguardPagesTable } from '@/components/nuguard/nuguard-pages-table';
 import { NuguardSourcesTable } from '@/components/nuguard/nuguard-sources-table';
 import { NuguardDemographics } from '@/components/nuguard/nuguard-demographics';
 import { NuguardJourneySection } from '@/components/nuguard/nuguard-journey-section';
+import { NuguardGithubStats } from '@/components/nuguard/nuguard-github-stats';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Suspense } from 'react';
 
 async function NuguardContent() {
   const dateRange = { from: null, to: null };
 
-  const [traffic, users, pages, countries, ages, genders, sources] = await Promise.allSettled([
+  const [traffic, users, pages, countries, ages, genders, sources, repoStats] = await Promise.allSettled([
     getNuguardTrafficSummary(dateRange),
     getNuguardUserSummary(dateRange),
     getNuguardTopPages(dateRange),
@@ -24,6 +27,7 @@ async function NuguardContent() {
     getNuguardDemographics(dateRange, 'age'),
     getNuguardDemographics(dateRange, 'gender'),
     getNuguardSources(dateRange),
+    getNuguardRepoStats(dateRange),
   ]);
 
   const trafficData = traffic.status === 'fulfilled' ? traffic.value : { totalPageViews: 0, totalUniqueVisitors: 0, dailyTraffic: [] };
@@ -33,36 +37,53 @@ async function NuguardContent() {
   const agesData = ages.status === 'fulfilled' ? ages.value : [];
   const gendersData = genders.status === 'fulfilled' ? genders.value : [];
   const sourcesData = sources.status === 'fulfilled' ? sources.value : [];
+  const repoStatsData = repoStats.status === 'fulfilled' ? repoStats.value : {
+    views: { count: 0, uniques: 0, views: [] },
+    clones: { count: 0, uniques: 0, clones: [] },
+  };
 
   return (
     <div className="flex flex-col gap-6 px-4 sm:px-10 py-6">
       <div>
-        <h1 className="text-2xl font-bold">NuGuard Website Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-1">nuguard.ai — Cloudflare + Google Analytics 4</p>
+        <h1 className="text-2xl font-bold">NuGuard Analytics</h1>
+        <p className="text-sm text-muted-foreground mt-1">nuguard.ai — website and GitHub repository stats</p>
       </div>
 
-      <NuguardStatsCards
-        dailyTraffic={trafficData.dailyTraffic}
-        totalActiveUsers={userData.totalActiveUsers}
-        avgSessionDurationSecs={userData.avgSessionDurationSecs}
-        avgBounceRate={userData.avgBounceRate}
-      />
+      <Tabs defaultValue="website">
+        <TabsList>
+          <TabsTrigger value="website">Website</TabsTrigger>
+          <TabsTrigger value="github">GitHub Repo</TabsTrigger>
+        </TabsList>
 
-      <NuguardTrafficChart dailyTraffic={trafficData.dailyTraffic} />
+        <TabsContent value="website" className="flex flex-col gap-6 mt-4">
+          <NuguardStatsCards
+            dailyTraffic={trafficData.dailyTraffic}
+            totalActiveUsers={userData.totalActiveUsers}
+            avgSessionDurationSecs={userData.avgSessionDurationSecs}
+            avgBounceRate={userData.avgBounceRate}
+          />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <NuguardPagesTable pages={pagesData} />
-        <NuguardSourcesTable sources={sourcesData} />
-      </div>
+          <NuguardTrafficChart dailyTraffic={trafficData.dailyTraffic} />
 
-      <NuguardDemographics countries={countriesData} ages={agesData} genders={gendersData} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <NuguardPagesTable pages={pagesData} />
+            <NuguardSourcesTable sources={sourcesData} />
+          </div>
 
-      <NuguardJourneySection
-        pages={pagesData}
-        avgSessionDurationSecs={userData.avgSessionDurationSecs}
-        totalSessions={userData.totalSessions}
-        totalPageViews={trafficData.totalPageViews}
-      />
+          <NuguardDemographics countries={countriesData} ages={agesData} genders={gendersData} />
+
+          <NuguardJourneySection
+            pages={pagesData}
+            avgSessionDurationSecs={userData.avgSessionDurationSecs}
+            totalSessions={userData.totalSessions}
+            totalPageViews={trafficData.totalPageViews}
+          />
+        </TabsContent>
+
+        <TabsContent value="github">
+          <NuguardGithubStats repoStats={repoStatsData} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -73,8 +94,8 @@ export default function NuguardPage() {
       fallback={
         <div className="flex flex-col gap-6 px-4 sm:px-10 py-6">
           <div>
-            <h1 className="text-2xl font-bold">NuGuard Website Analytics</h1>
-            <p className="text-sm text-muted-foreground mt-1">nuguard.ai — Cloudflare + Google Analytics 4</p>
+            <h1 className="text-2xl font-bold">NuGuard Analytics</h1>
+            <p className="text-sm text-muted-foreground mt-1">nuguard.ai — website and GitHub repository stats</p>
           </div>
           <NuguardStatsCardsSkeleton />
         </div>
