@@ -87,5 +87,6 @@ jobs:
               "GA4_PROPERTY_ID=secretref:ga4-property-id" \
               "GA4_SERVICE_ACCOUNT_JSON=secretref:ga4-service-account-json" \
               "CRON_SECRET=secretref:cron-secret" \
+              "PINNED_REPO=NuGuardAI/nuguard" \
               "ADMIN_GITHUB_LOGINS=${{ secrets.ADMIN_GITHUB_LOGINS }}" \
               "LOCAL_AUTH_GITHUB_TOKEN=secretref:local-auth-github-token"
