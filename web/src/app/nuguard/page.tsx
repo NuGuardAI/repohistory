@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import {
   getNuguardTrafficSummary,
   getNuguardUserSummary,
@@ -33,6 +35,11 @@ async function NuguardContent() {
     getNuguardSources(dateRange),
     getNuguardRepoStats(dateRange),
   ]);
+
+  const queryNames = ['traffic', 'users', 'pages', 'countries', 'ages', 'genders', 'sources', 'repoStats'];
+  [traffic, users, pages, countries, ages, genders, sources, repoStats].forEach((r, i) => {
+    if (r.status === 'rejected') console.error(`[nuguard] ${queryNames[i]} query failed:`, r.reason);
+  });
 
   const trafficData = traffic.status === 'fulfilled' ? traffic.value : { totalPageViews: 0, totalUniqueVisitors: 0, dailyTraffic: [] };
   const userData = users.status === 'fulfilled' ? users.value : { totalActiveUsers: 0, totalSessions: 0, avgSessionDurationSecs: 0, avgBounceRate: 0, avgEngagementRate: 0 };
