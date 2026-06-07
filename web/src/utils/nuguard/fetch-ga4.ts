@@ -2,9 +2,16 @@ import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { getDb } from '@/lib/db';
 
 function getClient(): BetaAnalyticsDataClient {
-  const encoded = process.env.GA4_SERVICE_ACCOUNT_JSON;
-  if (!encoded) throw new Error('GA4_SERVICE_ACCOUNT_JSON is not set');
-  const credentials = JSON.parse(Buffer.from(encoded, 'base64').toString('utf-8'));
+  const raw = process.env.GA4_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error('GA4_SERVICE_ACCOUNT_JSON is not set');
+  let credentials;
+  try {
+    // Support both raw JSON and base64-encoded JSON
+    const decoded = Buffer.from(raw, 'base64').toString('utf-8');
+    credentials = JSON.parse(decoded);
+  } catch {
+    credentials = JSON.parse(raw);
+  }
   return new BetaAnalyticsDataClient({ credentials });
 }
 
