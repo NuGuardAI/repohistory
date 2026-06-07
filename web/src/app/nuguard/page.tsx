@@ -6,8 +6,10 @@ import {
   getNuguardTopPages,
   getNuguardDemographics,
   getNuguardSources,
-  getNuguardRepoStats,
 } from '@/utils/nuguard/queries';
+import { getRepoClones } from '@/utils/repo/clones';
+import { getRepoViews } from '@/utils/repo/views';
+import { getUserOctokit } from '@/utils/octokit/get-user-octokit';
 import { NuguardStatsCards, NuguardStatsCardsSkeleton } from '@/components/nuguard/nuguard-stats-cards';
 import { NuguardTrafficChart } from '@/components/nuguard/nuguard-traffic-chart';
 import { NuguardPagesTable } from '@/components/nuguard/nuguard-pages-table';
@@ -20,12 +22,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 
+const NUGUARD_FULL_NAME = 'NuGuardAI/nuguard';
+const NUGUARD_REPO_ID = 1186790942;
+
 async function NuguardContent() {
   const session = await auth();
   const isAdmin = session?.isAdmin ?? false;
   const dateRange = { from: null, to: null };
+  const octokit = await getUserOctokit();
 
-  const [traffic, users, pages, countries, ages, genders, sources, repoStats] = await Promise.allSettled([
+  const [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews] = await Promise.allSettled([
     getNuguardTrafficSummary(dateRange),
     getNuguardUserSummary(dateRange),
     getNuguardTopPages(dateRange),
@@ -33,11 +39,12 @@ async function NuguardContent() {
     getNuguardDemographics(dateRange, 'age'),
     getNuguardDemographics(dateRange, 'gender'),
     getNuguardSources(dateRange),
-    getNuguardRepoStats(dateRange),
+    getRepoClones(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
+    getRepoViews(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
   ]);
 
-  const queryNames = ['traffic', 'users', 'pages', 'countries', 'ages', 'genders', 'sources', 'repoStats'];
-  [traffic, users, pages, countries, ages, genders, sources, repoStats].forEach((r, i) => {
+  const queryNames = ['traffic', 'users', 'pages', 'countries', 'ages', 'genders', 'sources', 'repoClones', 'repoViews'];
+  [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews].forEach((r, i) => {
     if (r.status === 'rejected') console.error(`[nuguard] ${queryNames[i]} query failed:`, r.reason);
   });
 
@@ -48,9 +55,9 @@ async function NuguardContent() {
   const agesData = ages.status === 'fulfilled' ? ages.value : [];
   const gendersData = genders.status === 'fulfilled' ? genders.value : [];
   const sourcesData = sources.status === 'fulfilled' ? sources.value : [];
-  const repoStatsData = repoStats.status === 'fulfilled' ? repoStats.value : {
-    views: { count: 0, uniques: 0, views: [] },
-    clones: { count: 0, uniques: 0, clones: [] },
+  const repoStatsData = {
+    views: repoViews.status === 'fulfilled' ? repoViews.value : { count: 0, uniques: 0, views: [] },
+    clones: repoClones.status === 'fulfilled' ? repoClones.value : { count: 0, uniques: 0, clones: [] },
   };
 
   return (
