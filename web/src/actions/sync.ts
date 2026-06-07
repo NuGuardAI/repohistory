@@ -38,7 +38,7 @@ export async function syncData(): Promise<SyncResult> {
   }
 
   if (!result.cloudflare && !result.ga4) {
-    return { ok: false, message: 'Cloudflare and GA4 credentials are not configured — nothing was synced' }
+    return { ok: false, message: 'Sync failed — Cloudflare and GA4 returned no data. Check server logs for details.' }
   }
 
   revalidatePath('/nuguard')
