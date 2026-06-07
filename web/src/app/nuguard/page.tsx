@@ -9,6 +9,8 @@ import {
 } from '@/utils/nuguard/queries';
 import { getRepoClones } from '@/utils/repo/clones';
 import { getRepoViews } from '@/utils/repo/views';
+import { getRepoReferrers } from '@/utils/repo/referrers';
+import { getRepoPaths } from '@/utils/repo/paths';
 import { getUserOctokit } from '@/utils/octokit/get-user-octokit';
 import { NuguardStatsCards, NuguardStatsCardsSkeleton } from '@/components/nuguard/nuguard-stats-cards';
 import { NuguardTrafficChart } from '@/components/nuguard/nuguard-traffic-chart';
@@ -31,7 +33,7 @@ async function NuguardContent() {
   const dateRange = { from: null, to: null };
   const octokit = await getUserOctokit();
 
-  const [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews] = await Promise.allSettled([
+  const [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews, repoReferrers, repoPaths] = await Promise.allSettled([
     getNuguardTrafficSummary(dateRange),
     getNuguardUserSummary(dateRange),
     getNuguardTopPages(dateRange),
@@ -41,10 +43,12 @@ async function NuguardContent() {
     getNuguardSources(dateRange),
     getRepoClones(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
     getRepoViews(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
+    getRepoReferrers(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
+    getRepoPaths(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
   ]);
 
-  const queryNames = ['traffic', 'users', 'pages', 'countries', 'ages', 'genders', 'sources', 'repoClones', 'repoViews'];
-  [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews].forEach((r, i) => {
+  const queryNames = ['traffic', 'users', 'pages', 'countries', 'ages', 'genders', 'sources', 'repoClones', 'repoViews', 'repoReferrers', 'repoPaths'];
+  [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews, repoReferrers, repoPaths].forEach((r, i) => {
     if (r.status === 'rejected') console.error(`[nuguard] ${queryNames[i]} query failed:`, r.reason);
   });
 
@@ -58,6 +62,8 @@ async function NuguardContent() {
   const repoStatsData = {
     views: repoViews.status === 'fulfilled' ? repoViews.value : { count: 0, uniques: 0, views: [] },
     clones: repoClones.status === 'fulfilled' ? repoClones.value : { count: 0, uniques: 0, clones: [] },
+    referrers: repoReferrers.status === 'fulfilled' ? repoReferrers.value.referrers : [],
+    paths: repoPaths.status === 'fulfilled' ? repoPaths.value.paths : [],
   };
 
   return (
