@@ -6,6 +6,7 @@ import {
   getNuguardTopPages,
   getNuguardDemographics,
   getNuguardSources,
+  getNuguardCFStats,
 } from '@/utils/nuguard/queries';
 import { getRepoClones } from '@/utils/repo/clones';
 import { getRepoViews } from '@/utils/repo/views';
@@ -19,6 +20,7 @@ import { NuguardSourcesTable } from '@/components/nuguard/nuguard-sources-table'
 import { NuguardDemographics } from '@/components/nuguard/nuguard-demographics';
 import { NuguardJourneySection } from '@/components/nuguard/nuguard-journey-section';
 import { NuguardGithubStats } from '@/components/nuguard/nuguard-github-stats';
+import { NuguardCloudflareStats } from '@/components/nuguard/nuguard-cloudflare-stats';
 import { NuguardRefreshButton } from '@/components/nuguard/nuguard-refresh-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Suspense } from 'react';
@@ -33,7 +35,7 @@ async function NuguardContent() {
   const dateRange = { from: null, to: null };
   const octokit = await getUserOctokit();
 
-  const [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews, repoReferrers, repoPaths] = await Promise.allSettled([
+  const [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews, repoReferrers, repoPaths, cfStats] = await Promise.allSettled([
     getNuguardTrafficSummary(dateRange),
     getNuguardUserSummary(dateRange),
     getNuguardTopPages(dateRange),
@@ -45,10 +47,11 @@ async function NuguardContent() {
     getRepoViews(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
     getRepoReferrers(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
     getRepoPaths(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
+    getNuguardCFStats(dateRange),
   ]);
 
-  const queryNames = ['traffic', 'users', 'pages', 'countries', 'ages', 'genders', 'sources', 'repoClones', 'repoViews', 'repoReferrers', 'repoPaths'];
-  [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews, repoReferrers, repoPaths].forEach((r, i) => {
+  const queryNames = ['traffic', 'users', 'pages', 'countries', 'ages', 'genders', 'sources', 'repoClones', 'repoViews', 'repoReferrers', 'repoPaths', 'cfStats'];
+  [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews, repoReferrers, repoPaths, cfStats].forEach((r, i) => {
     if (r.status === 'rejected') console.error(`[nuguard] ${queryNames[i]} query failed:`, r.reason);
   });
 
@@ -65,6 +68,7 @@ async function NuguardContent() {
     referrers: repoReferrers.status === 'fulfilled' ? repoReferrers.value.referrers : [],
     paths: repoPaths.status === 'fulfilled' ? repoPaths.value.paths : [],
   };
+  const cfStatsData = cfStats.status === 'fulfilled' ? cfStats.value : { dailyStats: [], countries: [] };
 
   return (
     <div className="flex flex-col gap-6 px-4 sm:px-10 py-6">
@@ -79,6 +83,7 @@ async function NuguardContent() {
       <Tabs defaultValue="website">
         <TabsList>
           <TabsTrigger value="website">Website</TabsTrigger>
+          <TabsTrigger value="cloudflare">Cloudflare</TabsTrigger>
           <TabsTrigger value="github">GitHub Repo</TabsTrigger>
         </TabsList>
 
@@ -105,6 +110,10 @@ async function NuguardContent() {
             totalSessions={userData.totalSessions}
             totalPageViews={trafficData.totalPageViews}
           />
+        </TabsContent>
+
+        <TabsContent value="cloudflare">
+          <NuguardCloudflareStats cfStats={cfStatsData} />
         </TabsContent>
 
         <TabsContent value="github">

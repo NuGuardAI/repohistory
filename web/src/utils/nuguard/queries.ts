@@ -49,16 +49,17 @@ export async function getNuguardTrafficSummary(dateRange: DateRange): Promise<Nu
   const sql = getDb();
   const filter = dateFilter(dateRange.from, dateRange.to);
 
+  // Use GA4 data: page_views = screenPageViews, unique_visitors = active_users
   const rows = filter
     ? await sql<Array<{ date: string; page_views: number; unique_visitors: number }>>`
-        SELECT date::text, page_views, unique_visitors
-        FROM nuguard_cf_daily
+        SELECT date::text, page_views, active_users AS unique_visitors
+        FROM nuguard_ga_daily
         WHERE date >= ${filter.since} AND date <= ${filter.until}
         ORDER BY date ASC
       `
     : await sql<Array<{ date: string; page_views: number; unique_visitors: number }>>`
-        SELECT date::text, page_views, unique_visitors
-        FROM nuguard_cf_daily
+        SELECT date::text, page_views, active_users AS unique_visitors
+        FROM nuguard_ga_daily
         ORDER BY date ASC
       `;
 
@@ -66,6 +67,55 @@ export async function getNuguardTrafficSummary(dateRange: DateRange): Promise<Nu
   const totalUniqueVisitors = rows.reduce((s, r) => s + r.unique_visitors, 0);
 
   return { totalPageViews, totalUniqueVisitors, dailyTraffic: rows };
+}
+
+export interface NuguardCFStats {
+  dailyStats: Array<{
+    date: string;
+    page_views: number;
+    requests: number;
+    bandwidth_bytes: number;
+    unique_visitors: number;
+  }>;
+  countries: Array<{ country_code: string; requests: number }>;
+}
+
+export async function getNuguardCFStats(dateRange: DateRange): Promise<NuguardCFStats> {
+  const sql = getDb();
+  const filter = dateFilter(dateRange.from, dateRange.to);
+
+  const [dailyRows, countryRows] = await Promise.all([
+    filter
+      ? sql<Array<{ date: string; page_views: number; requests: number; bandwidth_bytes: number; unique_visitors: number }>>`
+          SELECT date::text, page_views, requests, bandwidth_bytes, unique_visitors
+          FROM nuguard_cf_daily
+          WHERE date >= ${filter.since} AND date <= ${filter.until}
+          ORDER BY date ASC
+        `
+      : sql<Array<{ date: string; page_views: number; requests: number; bandwidth_bytes: number; unique_visitors: number }>>`
+          SELECT date::text, page_views, requests, bandwidth_bytes, unique_visitors
+          FROM nuguard_cf_daily
+          ORDER BY date ASC
+        `,
+    filter
+      ? sql<Array<{ country_code: string; requests: number }>>`
+          SELECT country_code, SUM(requests)::int AS requests
+          FROM nuguard_cf_countries
+          WHERE date >= ${filter.since} AND date <= ${filter.until}
+          GROUP BY country_code
+          ORDER BY requests DESC
+          LIMIT 20
+        `
+      : sql<Array<{ country_code: string; requests: number }>>`
+          SELECT country_code, SUM(requests)::int AS requests
+          FROM nuguard_cf_countries
+          GROUP BY country_code
+          ORDER BY requests DESC
+          LIMIT 20
+        `,
+  ]);
+
+  return { dailyStats: dailyRows, countries: countryRows };
 }
 
 export async function getNuguardUserSummary(dateRange: DateRange): Promise<NuguardUserSummary> {
