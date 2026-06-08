@@ -20,10 +20,19 @@ export async function syncData(): Promise<SyncResult> {
     const { updateTraffic } = await import('@/utils/update-traffic')
     const app = getApp()
     const pinnedRepo = process.env.PINNED_REPO
+    const trafficResults: Array<Awaited<ReturnType<typeof updateTraffic>>> = []
     await app.eachInstallation(async ({ installation }) => {
       if (installation.suspended_at) return
-      await updateTraffic(installation.id, pinnedRepo)
+      trafficResults.push(await updateTraffic(installation.id, pinnedRepo))
     })
+    const matchedRepos = trafficResults.reduce((sum, result) => sum + result.repositoriesMatched, 0)
+    const errors = trafficResults.flatMap(result => result.errors)
+    if (pinnedRepo && matchedRepos === 0) {
+      return { ok: false, message: `GitHub App cannot access ${pinnedRepo}. Check the app installation repository access.` }
+    }
+    if (errors.length > 0) {
+      return { ok: false, message: 'GitHub traffic sync failed. Check server logs for details.' }
+    }
   } catch (err) {
     console.warn('[sync] Skipping GitHub traffic — GitHub App not configured:', err instanceof Error ? err.message : err)
   }

@@ -1,13 +1,39 @@
 import { getApp } from '@/utils/octokit/app';
 import { getDb } from '@/lib/db';
 
-export async function updateTraffic(installationId: number, repoFilter?: string) {
+export interface TrafficUpdateResult {
+  installationId: number;
+  repositoriesSeen: number;
+  repositoriesMatched: number;
+  repositoriesUpdated: number;
+  errors: Array<{ repo: string; message: string }>;
+}
+
+function utcDateString(date = new Date()): string {
+  return date.toISOString().split('T')[0];
+}
+
+function normalizeRepoName(fullName: string): string {
+  return fullName.trim().toLowerCase();
+}
+
+export async function updateTraffic(installationId: number, repoFilter?: string): Promise<TrafficUpdateResult> {
   const sql = getDb();
   const app = getApp();
   const octokit = await app.getInstallationOctokit(installationId);
+  const normalizedRepoFilter = repoFilter ? normalizeRepoName(repoFilter) : undefined;
+  const result: TrafficUpdateResult = {
+    installationId,
+    repositoriesSeen: 0,
+    repositoriesMatched: 0,
+    repositoriesUpdated: 0,
+    errors: [],
+  };
 
-  app.eachRepository({ installationId }, async ({ repository }) => {
-    if (repoFilter && repository.full_name !== repoFilter) return;
+  await app.eachRepository({ installationId }, async ({ repository }) => {
+    result.repositoriesSeen += 1;
+    if (normalizedRepoFilter && normalizeRepoName(repository.full_name) !== normalizedRepoFilter) return;
+    result.repositoriesMatched += 1;
     try {
       const { data: viewsData } = await octokit.request(
         `GET /repos/${repository.full_name}/traffic/views`,
@@ -58,7 +84,7 @@ export async function updateTraffic(installationId: number, repoFilter?: string)
         }
       });
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = utcDateString();
       const pathsToUpsert = Array.from(pathsMap.values()).map(p => ({ ...p, date: today }));
 
       const referrersToUpsert = popularReferrersData.map((referrer: { referrer: string; count: number; uniques: number }) => ({
@@ -104,8 +130,13 @@ export async function updateTraffic(installationId: number, repoFilter?: string)
             uniques = EXCLUDED.uniques
         `;
       }
+      result.repositoriesUpdated += 1;
     } catch (error) {
-      console.error(repository.full_name, 'error', error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      result.errors.push({ repo: repository.full_name, message });
+      console.error(repository.full_name, 'error', message);
     }
   });
+
+  return result;
 }

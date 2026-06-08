@@ -77,7 +77,7 @@ export interface NuguardCFStats {
     bandwidth_bytes: number;
     unique_visitors: number;
   }>;
-  countries: Array<{ country_code: string; requests: number }>;
+  countries: Array<{ date: string; country_code: string; requests: number }>;
 }
 
 export async function getNuguardCFStats(dateRange: DateRange): Promise<NuguardCFStats> {
@@ -98,20 +98,16 @@ export async function getNuguardCFStats(dateRange: DateRange): Promise<NuguardCF
           ORDER BY date ASC
         `,
     filter
-      ? sql<Array<{ country_code: string; requests: number }>>`
-          SELECT country_code, SUM(requests)::int AS requests
+      ? sql<Array<{ date: string; country_code: string; requests: number }>>`
+          SELECT date::text, country_code, requests
           FROM nuguard_cf_countries
           WHERE date >= ${filter.since} AND date <= ${filter.until}
-          GROUP BY country_code
-          ORDER BY requests DESC
-          LIMIT 20
+          ORDER BY date ASC, requests DESC
         `
-      : sql<Array<{ country_code: string; requests: number }>>`
-          SELECT country_code, SUM(requests)::int AS requests
+      : sql<Array<{ date: string; country_code: string; requests: number }>>`
+          SELECT date::text, country_code, requests
           FROM nuguard_cf_countries
-          GROUP BY country_code
-          ORDER BY requests DESC
-          LIMIT 20
+          ORDER BY date ASC, requests DESC
         `,
   ]);
 

@@ -6,13 +6,14 @@ interface CfDailyNode {
     pageViews: number;
     requests: number;
     bytes: number;
+    countryMap?: CfCountryMapNode[];
   };
   uniq: { uniques: number };
 }
 
-interface CfCountryNode {
-  dimensions: { clientCountryName: string; date: string };
-  sum: { requests: number };
+interface CfCountryMapNode {
+  clientCountryName: string;
+  requests: number;
 }
 
 interface CfGraphQLResponse {
@@ -20,7 +21,6 @@ interface CfGraphQLResponse {
     viewer?: {
       zones?: Array<{
         httpRequests1dGroups?: CfDailyNode[];
-        httpRequestsAdaptiveGroups?: CfCountryNode[];
       }>;
     };
   };
@@ -58,16 +58,16 @@ export async function fetchCloudflare(): Promise<boolean> {
             orderBy: [date_ASC]
           ) {
             dimensions { date }
-            sum { pageViews requests bytes }
+            sum {
+              pageViews
+              requests
+              bytes
+              countryMap {
+                clientCountryName
+                requests
+              }
+            }
             uniq { uniques }
-          }
-          httpRequestsAdaptiveGroups(
-            limit: 1000
-            filter: { date_geq: "${since}", date_leq: "${until}" }
-            dimensions: [clientCountryName, date]
-          ) {
-            dimensions { clientCountryName date }
-            sum { requests }
           }
         }
       }
@@ -115,13 +115,15 @@ export async function fetchCloudflare(): Promise<boolean> {
     `;
   }
 
-  const countryRows = (zone.httpRequestsAdaptiveGroups ?? [])
-    .filter(n => n.dimensions.clientCountryName && n.dimensions.clientCountryName.length === 2)
-    .map(node => ({
-      date: node.dimensions.date,
-      country_code: node.dimensions.clientCountryName,
-      requests: node.sum.requests,
-    }));
+  const countryRows = (zone.httpRequests1dGroups ?? []).flatMap(node =>
+    (node.sum.countryMap ?? [])
+      .filter(country => country.clientCountryName && country.clientCountryName.length === 2)
+      .map(country => ({
+        date: node.dimensions.date,
+        country_code: country.clientCountryName,
+        requests: country.requests,
+      }))
+  );
 
   if (countryRows.length > 0) {
     await sql`
