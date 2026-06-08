@@ -16,11 +16,11 @@ jobs:
     steps:
       - name: Call NuGuard stats cron
         run: |
-          RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST \
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             "${{ env.APP_URL }}/api/cron/nuguard")
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
           echo "Response: $BODY (HTTP $HTTP_CODE)"
           if [ "$HTTP_CODE" != "200" ]; then
             echo "NuGuard stats cron failed with HTTP $HTTP_CODE"
@@ -33,11 +33,11 @@ jobs:
     steps:
       - name: Call GitHub traffic cron
         run: |
-          RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST \
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             "${{ env.APP_URL }}/api/cron/traffic")
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
           echo "Response: $BODY (HTTP $HTTP_CODE)"
           if [ "$HTTP_CODE" != "200" ]; then
             echo "GitHub traffic cron failed with HTTP $HTTP_CODE"

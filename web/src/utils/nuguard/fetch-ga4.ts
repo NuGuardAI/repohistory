@@ -19,6 +19,13 @@ function formatDate(d: Date): string {
   return d.toISOString().split('T')[0];
 }
 
+function parseGA4Date(rawDate: string): string {
+  if (!/^\d{8}$/.test(rawDate)) {
+    throw new Error(`Invalid GA4 date value: ${rawDate || '<empty>'}`);
+  }
+  return `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
+}
+
 function lastNDays(n: number): { startDate: string; endDate: string } {
   const end = new Date();
   const start = new Date();
@@ -44,7 +51,7 @@ export async function fetchGA4(): Promise<boolean> {
 
   const client = getClient();
   const sql = getDb();
-  const { startDate, endDate } = lastNDays(3);
+  const { startDate, endDate } = lastNDays(30);
   const property = `properties/${propertyId}`;
 
   const [dailyRes, pagesRes, countryRes, ageGenderRes, sourcesRes] = await Promise.allSettled([
@@ -98,7 +105,7 @@ export async function fetchGA4(): Promise<boolean> {
   if (dailyRes.status === 'fulfilled') {
     const rows = (dailyRes.value[0].rows ?? []).map(row => {
       const rawDate = getDimValue(row, 0); // YYYYMMDD
-      const date = `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
+      const date = parseGA4Date(rawDate);
       return {
         date,
         active_users: Math.round(getMetricValue(row, 0)),
@@ -133,7 +140,7 @@ export async function fetchGA4(): Promise<boolean> {
   if (pagesRes.status === 'fulfilled') {
     const rows = (pagesRes.value[0].rows ?? []).map(row => {
       const rawDate = getDimValue(row, 0);
-      const date = `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
+      const date = parseGA4Date(rawDate);
       const pageViews = Math.round(getMetricValue(row, 0));
       const totalEngagement = getMetricValue(row, 1);
       return {
@@ -163,7 +170,7 @@ export async function fetchGA4(): Promise<boolean> {
   if (countryRes.status === 'fulfilled') {
     for (const row of (countryRes.value[0].rows ?? [])) {
       const rawDate = getDimValue(row, 0);
-      const date = `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
+      const date = parseGA4Date(rawDate);
       const country = getDimValue(row, 1);
       if (country && country !== '(not set)') {
         demographicRows.push({ date, dimension: 'country', value: country, users: Math.round(getMetricValue(row, 0)) });
@@ -176,7 +183,7 @@ export async function fetchGA4(): Promise<boolean> {
   if (ageGenderRes.status === 'fulfilled') {
     for (const row of (ageGenderRes.value[0].rows ?? [])) {
       const rawDate = getDimValue(row, 0);
-      const date = `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
+      const date = parseGA4Date(rawDate);
       const age = getDimValue(row, 1);
       const gender = getDimValue(row, 2);
       const users = Math.round(getMetricValue(row, 0));
@@ -205,7 +212,7 @@ export async function fetchGA4(): Promise<boolean> {
   if (sourcesRes.status === 'fulfilled') {
     const rows = (sourcesRes.value[0].rows ?? []).map(row => {
       const rawDate = getDimValue(row, 0);
-      const date = `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`;
+      const date = parseGA4Date(rawDate);
       return {
         date,
         source: getDimValue(row, 1) || '(direct)',

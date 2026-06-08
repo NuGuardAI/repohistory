@@ -44,7 +44,7 @@ async function getReposViaOAuth(octokit: Octokit): Promise<RepoResult> {
 const PINNED_REPO = process.env.PINNED_REPO;
 
 function filterPinned(repos: Repo[]): Repo[] {
-  return PINNED_REPO ? repos.filter(r => r.full_name === PINNED_REPO) : repos;
+  return PINNED_REPO ? repos.filter(r => r.full_name.toLowerCase() === PINNED_REPO.toLowerCase()) : repos;
 }
 
 export async function getRepos(octokit: Octokit): Promise<RepoResult> {
