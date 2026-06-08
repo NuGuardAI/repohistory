@@ -53,7 +53,7 @@ export function NuguardTrafficChart({ dailyTraffic }: NuguardTrafficChartProps) 
       <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b">
         <div className="flex flex-1 flex-col justify-center gap-1">
           <CardTitle>Site Traffic</CardTitle>
-          <CardDescription>Daily page views and unique visitors (Cloudflare)</CardDescription>
+          <CardDescription>Daily page views and unique visitors (GA4)</CardDescription>
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className="text-xs text-muted-foreground">Total Views</span>

@@ -1,0 +1,45 @@
+name: NuGuard Stats Cron
+
+on:
+  schedule:
+    # Runs every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+env:
+  APP_URL: https://repohistory.blacksmoke-efb72e6e.eastus.azurecontainerapps.io
+
+jobs:
+  sync-nuguard-stats:
+    name: Sync NuGuard Stats (GA4 + Cloudflare)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call NuGuard stats cron
+        run: |
+          RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "${{ env.APP_URL }}/api/cron/nuguard")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "Response: $BODY (HTTP $HTTP_CODE)"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "NuGuard stats cron failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+  sync-github-traffic:
+    name: Sync GitHub Traffic
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call GitHub traffic cron
+        run: |
+          RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "${{ env.APP_URL }}/api/cron/traffic")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "Response: $BODY (HTTP $HTTP_CODE)"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "GitHub traffic cron failed with HTTP $HTTP_CODE"
+            exit 1
+          fi

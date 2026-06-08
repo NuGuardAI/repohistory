@@ -6,8 +6,13 @@ import {
   getNuguardTopPages,
   getNuguardDemographics,
   getNuguardSources,
-  getNuguardRepoStats,
+  getNuguardCFStats,
 } from '@/utils/nuguard/queries';
+import { getRepoClones } from '@/utils/repo/clones';
+import { getRepoViews } from '@/utils/repo/views';
+import { getRepoReferrers } from '@/utils/repo/referrers';
+import { getRepoPaths } from '@/utils/repo/paths';
+import { getUserOctokit } from '@/utils/octokit/get-user-octokit';
 import { NuguardStatsCards, NuguardStatsCardsSkeleton } from '@/components/nuguard/nuguard-stats-cards';
 import { NuguardTrafficChart } from '@/components/nuguard/nuguard-traffic-chart';
 import { NuguardPagesTable } from '@/components/nuguard/nuguard-pages-table';
@@ -15,17 +20,22 @@ import { NuguardSourcesTable } from '@/components/nuguard/nuguard-sources-table'
 import { NuguardDemographics } from '@/components/nuguard/nuguard-demographics';
 import { NuguardJourneySection } from '@/components/nuguard/nuguard-journey-section';
 import { NuguardGithubStats } from '@/components/nuguard/nuguard-github-stats';
+import { NuguardCloudflareStats } from '@/components/nuguard/nuguard-cloudflare-stats';
 import { NuguardRefreshButton } from '@/components/nuguard/nuguard-refresh-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Suspense } from 'react';
 import { auth } from '@/lib/auth';
 
+const NUGUARD_FULL_NAME = 'NuGuardAI/nuguard';
+const NUGUARD_REPO_ID = 1186790942;
+
 async function NuguardContent() {
   const session = await auth();
   const isAdmin = session?.isAdmin ?? false;
   const dateRange = { from: null, to: null };
+  const octokit = await getUserOctokit();
 
-  const [traffic, users, pages, countries, ages, genders, sources, repoStats] = await Promise.allSettled([
+  const [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews, repoReferrers, repoPaths, cfStats] = await Promise.allSettled([
     getNuguardTrafficSummary(dateRange),
     getNuguardUserSummary(dateRange),
     getNuguardTopPages(dateRange),
@@ -33,11 +43,15 @@ async function NuguardContent() {
     getNuguardDemographics(dateRange, 'age'),
     getNuguardDemographics(dateRange, 'gender'),
     getNuguardSources(dateRange),
-    getNuguardRepoStats(dateRange),
+    getRepoClones(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
+    getRepoViews(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
+    getRepoReferrers(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
+    getRepoPaths(octokit, NUGUARD_FULL_NAME, NUGUARD_REPO_ID),
+    getNuguardCFStats(dateRange),
   ]);
 
-  const queryNames = ['traffic', 'users', 'pages', 'countries', 'ages', 'genders', 'sources', 'repoStats'];
-  [traffic, users, pages, countries, ages, genders, sources, repoStats].forEach((r, i) => {
+  const queryNames = ['traffic', 'users', 'pages', 'countries', 'ages', 'genders', 'sources', 'repoClones', 'repoViews', 'repoReferrers', 'repoPaths', 'cfStats'];
+  [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews, repoReferrers, repoPaths, cfStats].forEach((r, i) => {
     if (r.status === 'rejected') console.error(`[nuguard] ${queryNames[i]} query failed:`, r.reason);
   });
 
@@ -48,10 +62,13 @@ async function NuguardContent() {
   const agesData = ages.status === 'fulfilled' ? ages.value : [];
   const gendersData = genders.status === 'fulfilled' ? genders.value : [];
   const sourcesData = sources.status === 'fulfilled' ? sources.value : [];
-  const repoStatsData = repoStats.status === 'fulfilled' ? repoStats.value : {
-    views: { count: 0, uniques: 0, views: [] },
-    clones: { count: 0, uniques: 0, clones: [] },
+  const repoStatsData = {
+    views: repoViews.status === 'fulfilled' ? repoViews.value : { count: 0, uniques: 0, views: [] },
+    clones: repoClones.status === 'fulfilled' ? repoClones.value : { count: 0, uniques: 0, clones: [] },
+    referrers: repoReferrers.status === 'fulfilled' ? repoReferrers.value.referrers : [],
+    paths: repoPaths.status === 'fulfilled' ? repoPaths.value.paths : [],
   };
+  const cfStatsData = cfStats.status === 'fulfilled' ? cfStats.value : { dailyStats: [], countries: [] };
 
   return (
     <div className="flex flex-col gap-6 px-4 sm:px-10 py-6">
@@ -66,6 +83,7 @@ async function NuguardContent() {
       <Tabs defaultValue="website">
         <TabsList>
           <TabsTrigger value="website">Website</TabsTrigger>
+          <TabsTrigger value="cloudflare">Cloudflare</TabsTrigger>
           <TabsTrigger value="github">GitHub Repo</TabsTrigger>
         </TabsList>
 
@@ -92,6 +110,10 @@ async function NuguardContent() {
             totalSessions={userData.totalSessions}
             totalPageViews={trafficData.totalPageViews}
           />
+        </TabsContent>
+
+        <TabsContent value="cloudflare">
+          <NuguardCloudflareStats cfStats={cfStatsData} />
         </TabsContent>
 
         <TabsContent value="github">

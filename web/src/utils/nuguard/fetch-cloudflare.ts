@@ -1,7 +1,7 @@
 import { getDb } from '@/lib/db';
 
 interface CfDailyNode {
-  date: string;
+  dimensions: { date: string };
   sum: {
     pageViews: number;
     requests: number;
@@ -11,8 +11,7 @@ interface CfDailyNode {
 }
 
 interface CfCountryNode {
-  date: string;
-  dimensions: { clientCountryName: string };
+  dimensions: { clientCountryName: string; date: string };
   sum: { requests: number };
 }
 
@@ -47,28 +46,27 @@ export async function fetchCloudflare(): Promise<boolean> {
   }
 
   const sql = getDb();
-  const { since, until } = lastNDays(3);
+  const { since, until } = lastNDays(30);
 
   const query = `
     query {
       viewer {
         zones(filter: { zoneTag: "${zoneId}" }) {
           httpRequests1dGroups(
-            limit: 10
+            limit: 40
             filter: { date_geq: "${since}", date_leq: "${until}" }
             orderBy: [date_ASC]
           ) {
-            date
+            dimensions { date }
             sum { pageViews requests bytes }
             uniq { uniques }
           }
           httpRequestsAdaptiveGroups(
-            limit: 500
+            limit: 1000
             filter: { date_geq: "${since}", date_leq: "${until}" }
             dimensions: [clientCountryName, date]
           ) {
-            date
-            dimensions { clientCountryName }
+            dimensions { clientCountryName date }
             sum { requests }
           }
         }
@@ -99,7 +97,7 @@ export async function fetchCloudflare(): Promise<boolean> {
   if (!zone) return false;
 
   const dailyRows = (zone.httpRequests1dGroups ?? []).map(node => ({
-    date: node.date,
+    date: node.dimensions.date,
     page_views: node.sum.pageViews,
     unique_visitors: node.uniq.uniques,
     requests: node.sum.requests,
@@ -120,7 +118,7 @@ export async function fetchCloudflare(): Promise<boolean> {
   const countryRows = (zone.httpRequestsAdaptiveGroups ?? [])
     .filter(n => n.dimensions.clientCountryName && n.dimensions.clientCountryName.length === 2)
     .map(node => ({
-      date: node.date,
+      date: node.dimensions.date,
       country_code: node.dimensions.clientCountryName,
       requests: node.sum.requests,
     }));
