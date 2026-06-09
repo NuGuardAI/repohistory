@@ -13,6 +13,7 @@ import { getRepoViews } from '@/utils/repo/views';
 import { getRepoReferrers } from '@/utils/repo/referrers';
 import { getRepoPaths } from '@/utils/repo/paths';
 import { getUserOctokit } from '@/utils/octokit/get-user-octokit';
+import { getPinnedRepoOctokit } from '@/utils/octokit/get-pinned-repo-octokit';
 import { NuguardStatsCards, NuguardStatsCardsSkeleton } from '@/components/nuguard/nuguard-stats-cards';
 import { NuguardTrafficChart } from '@/components/nuguard/nuguard-traffic-chart';
 import { NuguardPagesTable } from '@/components/nuguard/nuguard-pages-table';
@@ -33,7 +34,11 @@ async function NuguardContent() {
   const session = await auth();
   const isAdmin = session?.isAdmin ?? false;
   const dateRange = { from: null, to: null };
-  const octokit = await getUserOctokit();
+  // Prefer the GitHub App installation token for the pinned repo — it has
+  // persistent push-level access and doesn't expire with the user's session.
+  // Fall back to the user's OAuth token if the App is not configured.
+  const appOctokit = await getPinnedRepoOctokit();
+  const octokit = appOctokit ?? await getUserOctokit();
 
   const [traffic, users, pages, countries, ages, genders, sources, repoClones, repoViews, repoReferrers, repoPaths, cfStats] = await Promise.allSettled([
     getNuguardTrafficSummary(dateRange),
@@ -68,7 +73,7 @@ async function NuguardContent() {
     referrers: repoReferrers.status === 'fulfilled' ? repoReferrers.value.referrers : [],
     paths: repoPaths.status === 'fulfilled' ? repoPaths.value.paths : [],
   };
-  const cfStatsData = cfStats.status === 'fulfilled' ? cfStats.value : { dailyStats: [], countries: [] };
+  const cfStatsData = cfStats.status === 'fulfilled' ? cfStats.value : { dailyStats: [], countries: [], urls: [] };
 
   return (
     <div className="flex flex-col gap-6 px-4 sm:px-10 py-6">

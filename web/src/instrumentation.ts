@@ -57,16 +57,30 @@ export async function register() {
         page_views       INTEGER NOT NULL DEFAULT 0,
         unique_visitors  INTEGER NOT NULL DEFAULT 0,
         requests         INTEGER NOT NULL DEFAULT 0,
-        bandwidth_bytes  BIGINT  NOT NULL DEFAULT 0
+        bandwidth_bytes  BIGINT  NOT NULL DEFAULT 0,
+        avg_edge_ttfb_ms FLOAT
       )
     `;
+    await sql`ALTER TABLE nuguard_cf_daily ADD COLUMN IF NOT EXISTS avg_edge_ttfb_ms FLOAT`;
     await sql`
       CREATE TABLE IF NOT EXISTS nuguard_cf_countries (
-        id           BIGSERIAL PRIMARY KEY,
-        date         DATE    NOT NULL,
-        country_code CHAR(2) NOT NULL,
-        requests     INTEGER NOT NULL DEFAULT 0,
+        id               BIGSERIAL PRIMARY KEY,
+        date             DATE    NOT NULL,
+        country_code     CHAR(2) NOT NULL,
+        requests         INTEGER NOT NULL DEFAULT 0,
+        unique_visitors  INTEGER NOT NULL DEFAULT 0,
         UNIQUE (date, country_code)
+      )
+    `;
+    await sql`ALTER TABLE nuguard_cf_countries ADD COLUMN IF NOT EXISTS unique_visitors INTEGER NOT NULL DEFAULT 0`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS nuguard_cf_urls (
+        id              BIGSERIAL PRIMARY KEY,
+        date            DATE    NOT NULL,
+        url_path        TEXT    NOT NULL,
+        requests        INTEGER NOT NULL DEFAULT 0,
+        unique_visitors INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (date, url_path)
       )
     `;
     await sql`

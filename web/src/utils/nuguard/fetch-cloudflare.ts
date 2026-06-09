@@ -2,18 +2,20 @@ import { getDb } from '@/lib/db';
 
 interface CfDailyNode {
   dimensions: { date: string };
-  sum: {
-    pageViews: number;
-    requests: number;
-    bytes: number;
-    countryMap?: CfCountryMapNode[];
-  };
+  sum: { pageViews: number; requests: number; bytes: number };
   uniq: { uniques: number };
 }
 
-interface CfCountryMapNode {
-  clientCountryName: string;
-  requests: number;
+interface CfCountryNode {
+  dimensions: { clientCountryName: string; date: string };
+  sum: { requests: number };
+  uniq: { uniques: number };
+}
+
+interface CfUrlNode {
+  dimensions: { clientRequestPath: string; date: string };
+  sum: { requests: number };
+  uniq: { uniques: number };
 }
 
 interface CfGraphQLResponse {
@@ -21,6 +23,8 @@ interface CfGraphQLResponse {
     viewer?: {
       zones?: Array<{
         httpRequests1dGroups?: CfDailyNode[];
+        countryGroups?: CfCountryNode[];
+        urlGroups?: CfUrlNode[];
       }>;
     };
   };
@@ -48,6 +52,7 @@ export async function fetchCloudflare(): Promise<boolean> {
   const sql = getDb();
   const { since, until } = lastNDays(30);
 
+  // Single GraphQL request covering daily totals, per-country uniques, and top URLs
   const query = `
     query {
       viewer {
@@ -58,15 +63,26 @@ export async function fetchCloudflare(): Promise<boolean> {
             orderBy: [date_ASC]
           ) {
             dimensions { date }
-            sum {
-              pageViews
-              requests
-              bytes
-              countryMap {
-                clientCountryName
-                requests
-              }
-            }
+            sum { pageViews requests bytes }
+            uniq { uniques }
+          }
+          countryGroups: httpRequestsAdaptiveGroups(
+            limit: 500
+            filter: { date_geq: "${since}", date_leq: "${until}" }
+            dimensions: [clientCountryName, date]
+          ) {
+            dimensions { clientCountryName date }
+            sum { requests }
+            uniq { uniques }
+          }
+          urlGroups: httpRequestsAdaptiveGroups(
+            limit: 50
+            filter: { date_geq: "${since}", date_leq: "${until}" }
+            dimensions: [clientRequestPath, date]
+            orderBy: [uniq_uniques_DESC]
+          ) {
+            dimensions { clientRequestPath date }
+            sum { requests }
             uniq { uniques }
           }
         }
@@ -96,6 +112,7 @@ export async function fetchCloudflare(): Promise<boolean> {
   const zone = body.data?.viewer?.zones?.[0];
   if (!zone) return false;
 
+  // Daily totals
   const dailyRows = (zone.httpRequests1dGroups ?? []).map(node => ({
     date: node.dimensions.date,
     page_views: node.sum.pageViews,
@@ -115,24 +132,44 @@ export async function fetchCloudflare(): Promise<boolean> {
     `;
   }
 
-  const countryRows = (zone.httpRequests1dGroups ?? []).flatMap(node =>
-    (node.sum.countryMap ?? [])
-      .filter(country => country.clientCountryName && country.clientCountryName.length === 2)
-      .map(country => ({
-        date: node.dimensions.date,
-        country_code: country.clientCountryName,
-        requests: country.requests,
-      }))
-  );
+  // Per-country unique visitors
+  const countryRows = (zone.countryGroups ?? [])
+    .filter(n => n.dimensions.clientCountryName?.length === 2)
+    .map(node => ({
+      date: node.dimensions.date,
+      country_code: node.dimensions.clientCountryName,
+      requests: node.sum.requests,
+      unique_visitors: node.uniq.uniques,
+    }));
 
   if (countryRows.length > 0) {
     await sql`
-      INSERT INTO nuguard_cf_countries ${sql(countryRows, 'date', 'country_code', 'requests')}
+      INSERT INTO nuguard_cf_countries ${sql(countryRows, 'date', 'country_code', 'requests', 'unique_visitors')}
       ON CONFLICT (date, country_code) DO UPDATE SET
-        requests = EXCLUDED.requests
+        requests        = EXCLUDED.requests,
+        unique_visitors = EXCLUDED.unique_visitors
     `;
   }
 
-  console.log(`Cloudflare: upserted ${dailyRows.length} daily rows, ${countryRows.length} country rows`);
+  // Top URLs with unique visitors
+  const urlRows = (zone.urlGroups ?? [])
+    .filter(n => n.dimensions.clientRequestPath)
+    .map(node => ({
+      date: node.dimensions.date,
+      url_path: node.dimensions.clientRequestPath,
+      requests: node.sum.requests,
+      unique_visitors: node.uniq.uniques,
+    }));
+
+  if (urlRows.length > 0) {
+    await sql`
+      INSERT INTO nuguard_cf_urls ${sql(urlRows, 'date', 'url_path', 'requests', 'unique_visitors')}
+      ON CONFLICT (date, url_path) DO UPDATE SET
+        requests        = EXCLUDED.requests,
+        unique_visitors = EXCLUDED.unique_visitors
+    `;
+  }
+
+  console.log(`Cloudflare: upserted ${dailyRows.length} daily, ${countryRows.length} country, ${urlRows.length} URL rows`);
   return true;
 }

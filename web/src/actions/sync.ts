@@ -15,6 +15,8 @@ export async function syncData(): Promise<SyncResult> {
     return { ok: false, message: 'Forbidden: admin access required' }
   }
 
+  // GitHub traffic sync (non-fatal — failures are logged but don't block GA4/CF)
+  let githubSynced = false
   try {
     const { getApp } = await import('@/utils/octokit/app')
     const { updateTraffic } = await import('@/utils/update-traffic')
@@ -27,12 +29,10 @@ export async function syncData(): Promise<SyncResult> {
     })
     const matchedRepos = trafficResults.reduce((sum, result) => sum + result.repositoriesMatched, 0)
     const errors = trafficResults.flatMap(result => result.errors)
-    if (pinnedRepo && matchedRepos === 0) {
-      return { ok: false, message: `GitHub App cannot access ${pinnedRepo}. Check the app installation repository access.` }
-    }
     if (errors.length > 0) {
-      return { ok: false, message: 'GitHub traffic sync failed. Check server logs for details.' }
+      console.warn('[sync] GitHub traffic errors:', errors)
     }
+    githubSynced = matchedRepos > 0
   } catch (err) {
     console.warn('[sync] Skipping GitHub traffic — GitHub App not configured:', err instanceof Error ? err.message : err)
   }
@@ -52,6 +52,10 @@ export async function syncData(): Promise<SyncResult> {
 
   revalidatePath('/nuguard')
 
-  const synced = [result.cloudflare && 'Cloudflare', result.ga4 && 'GA4'].filter(Boolean).join(' and ')
-  return { ok: true, message: `${synced} data refreshed successfully` }
+  const synced = [
+    githubSynced && 'GitHub traffic',
+    result.cloudflare && 'Cloudflare',
+    result.ga4 && 'GA4',
+  ].filter(Boolean).join(', ')
+  return { ok: true, message: `${synced} refreshed successfully` }
 }
