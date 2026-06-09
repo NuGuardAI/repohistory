@@ -4,15 +4,26 @@ CREATE TABLE IF NOT EXISTS nuguard_cf_daily (
   page_views       INTEGER NOT NULL DEFAULT 0,
   unique_visitors  INTEGER NOT NULL DEFAULT 0,
   requests         INTEGER NOT NULL DEFAULT 0,
-  bandwidth_bytes  BIGINT  NOT NULL DEFAULT 0
+  bandwidth_bytes  BIGINT  NOT NULL DEFAULT 0,
+  avg_edge_ttfb_ms FLOAT
 );
 
 CREATE TABLE IF NOT EXISTS nuguard_cf_countries (
-  id           BIGSERIAL PRIMARY KEY,
-  date         DATE    NOT NULL,
-  country_code CHAR(2) NOT NULL,
-  requests     INTEGER NOT NULL DEFAULT 0,
+  id               BIGSERIAL PRIMARY KEY,
+  date             DATE    NOT NULL,
+  country_code     CHAR(2) NOT NULL,
+  requests         INTEGER NOT NULL DEFAULT 0,
+  unique_visitors  INTEGER NOT NULL DEFAULT 0,
   UNIQUE (date, country_code)
+);
+
+CREATE TABLE IF NOT EXISTS nuguard_cf_urls (
+  id              BIGSERIAL PRIMARY KEY,
+  date            DATE    NOT NULL,
+  url_path        TEXT    NOT NULL,
+  requests        INTEGER NOT NULL DEFAULT 0,
+  unique_visitors INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (date, url_path)
 );
 
 CREATE TABLE IF NOT EXISTS nuguard_ga_daily (

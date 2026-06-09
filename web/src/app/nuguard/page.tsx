@@ -68,7 +68,7 @@ async function NuguardContent() {
     referrers: repoReferrers.status === 'fulfilled' ? repoReferrers.value.referrers : [],
     paths: repoPaths.status === 'fulfilled' ? repoPaths.value.paths : [],
   };
-  const cfStatsData = cfStats.status === 'fulfilled' ? cfStats.value : { dailyStats: [], countries: [] };
+  const cfStatsData = cfStats.status === 'fulfilled' ? cfStats.value : { dailyStats: [], countries: [], urls: [] };
 
   return (
     <div className="flex flex-col gap-6 px-4 sm:px-10 py-6">
