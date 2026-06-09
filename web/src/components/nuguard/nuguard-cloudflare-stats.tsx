@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Eye, Globe2, Network, ShieldCheck, Users, Wifi } from 'lucide-react';
-import { Area, Bar, BarChart, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { Area, Bar, BarChart, XAxis, YAxis } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartConfig, ChartTooltip, ChartContainer } from '@/components/ui/chart';
