@@ -25,15 +25,15 @@ export async function POST(request: NextRequest) {
   const viewRows = views.map(r => ({ repo_id: repoId, date: r.date, total: r.total, uniques: r.uniques }));
   const cloneRows = clones.map(r => ({ repo_id: repoId, date: r.date, total: r.total, uniques: r.uniques }));
 
-  const [vResult, cResult] = await Promise.all([
+  await Promise.all([
     viewRows.length > 0
       ? sql`INSERT INTO views ${sql(viewRows, 'repo_id', 'date', 'total', 'uniques')}
             ON CONFLICT (repo_id, date) DO UPDATE SET total = EXCLUDED.total, uniques = EXCLUDED.uniques`
-      : Promise.resolve({ count: 0 }),
+      : Promise.resolve(null),
     cloneRows.length > 0
       ? sql`INSERT INTO clones ${sql(cloneRows, 'repo_id', 'date', 'total', 'uniques')}
             ON CONFLICT (repo_id, date) DO UPDATE SET total = EXCLUDED.total, uniques = EXCLUDED.uniques`
-      : Promise.resolve({ count: 0 }),
+      : Promise.resolve(null),
   ]);
 
   return NextResponse.json({
