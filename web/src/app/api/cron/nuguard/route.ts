@@ -9,10 +9,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await updateNuguardStats();
-    if (!result.cloudflare || !result.ga4) {
-      return NextResponse.json({ ok: false, ...result }, { status: 502 });
-    }
-    return NextResponse.json({ ok: true, ...result });
+    const ok = result.cloudflare && result.ga4;
+    return NextResponse.json({ ok, ...result });
   } catch (error) {
     console.error('[cron/nuguard] Unhandled error:', error instanceof Error ? error.message : String(error));
     return NextResponse.json({ error: String(error) }, { status: 500 });
