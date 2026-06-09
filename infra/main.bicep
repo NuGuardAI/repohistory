@@ -1,7 +1,6 @@
 // Azure infrastructure for Repohistory
-// Resources: Container Registry, PostgreSQL container (Azure Files), Container Apps Environment + App, Log Analytics, Managed Identity
-// Estimated cost: ~$10-15/mo  (ACR Basic ~$5 + Azure Files ~$1 + Container Apps consumption ~$2-7 + Log Analytics ~$2)
-// Note: Uses postgres:16-alpine container instead of Flexible Server to avoid subscription quota restrictions.
+// Resources: Container Registry, Azure PostgreSQL Flexible Server, Container Apps Environment + App, Log Analytics, Managed Identity
+// Estimated cost: ~$15-25/mo  (ACR Basic ~$5 + PostgreSQL Flexible Burstable B1ms ~$12 + Container Apps consumption ~$2-7 + Log Analytics ~$2)
 
 param location string = 'eastus'
 param appName string = 'repohistory'
@@ -82,7 +81,7 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-// ── Storage Account + Azure Files (PostgreSQL data persistence) ──────────────
+// ── Storage Account + Azure Files (kept for future use / backups) ───────────
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: '${replace(appName, '-', '')}pgdata'
   location: location
@@ -94,9 +93,55 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
-resource filesShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-01-01' = {
-  name: '${storageAccount.name}/default/postgres-data'
-  properties: { shareQuota: 5 }
+// ── Azure PostgreSQL Flexible Server ─────────────────────────────────────────
+// Fully-managed, persists data independently of Container App deployments.
+// Burstable B1ms: 1 vCore, 2 GiB RAM — sufficient for this workload at ~$12/mo.
+resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
+  name: '${appName}-pg'
+  location: location
+  sku: {
+    name: 'Standard_B1ms'
+    tier: 'Burstable'
+  }
+  properties: {
+    version: '16'
+    administratorLogin: postgresAdminUser
+    administratorLoginPassword: postgresAdminPassword
+    storage: {
+      storageSizeGB: 32
+    }
+    backup: {
+      backupRetentionDays: 7
+      geoRedundantBackup: 'Disabled'
+    }
+    highAvailability: {
+      mode: 'Disabled'
+    }
+    // Public access disabled — only accessible within the same VNet/environment
+    // For Container Apps without VNet integration, use public access with firewall rules
+    network: {
+      publicNetworkAccess: 'Enabled'
+    }
+  }
+}
+
+// Allow Azure services (including Container Apps) to connect
+resource postgresFirewallAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2022-12-01' = {
+  parent: postgresServer
+  name: 'AllowAzureServices'
+  properties: {
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
+  }
+}
+
+resource postgresDb 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2022-12-01' = {
+  parent: postgresServer
+  name: 'repohistory'
+  properties: {
+    charset: 'UTF8'
+    collation: 'en_US.utf8'
+  }
 }
 
 // ── Log Analytics ─────────────────────────────────────────────────────────────
@@ -127,53 +172,9 @@ resource caEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
   }
 }
 
-// ── PostgreSQL container (internal TCP, single replica, ephemeral storage) ──
-// Note: Azure Files (SMB) does not support chmod — postgres cannot init.
-// Using ephemeral container storage instead. Data persists across restarts
-// but not across container replacement/redeployment.
-resource postgresApp 'Microsoft.App/containerApps@2024-03-01' = {
-  name: 'postgres'
-  location: location
-  properties: {
-    environmentId: caEnv.id
-    configuration: {
-      ingress: {
-        external: false
-        transport: 'tcp'
-        targetPort: 5432
-        exposedPort: 5432
-      }
-      secrets: [
-        { name: 'postgres-password', value: postgresAdminPassword }
-      ]
-    }
-    template: {
-      containers: [
-        {
-          name: 'postgres'
-          image: 'postgres:16-alpine'
-          resources: {
-            cpu: json('0.25')
-            memory: '0.5Gi'
-          }
-          env: [
-            { name: 'POSTGRES_DB', value: 'repohistory' }
-            { name: 'POSTGRES_USER', value: postgresAdminUser }
-            { name: 'POSTGRES_PASSWORD', secretRef: 'postgres-password' }
-          ]
-        }
-      ]
-      scale: {
-        minReplicas: 1
-        maxReplicas: 1
-      }
-    }
-  }
-}
-
 // ── Container App ─────────────────────────────────────────────────────────────
-// postgres app name is its internal DNS hostname within the same CA environment
-var databaseUrl = 'postgres://${postgresAdminUser}:${postgresAdminPassword}@postgres:5432/repohistory'
+// Connects to Azure PostgreSQL Flexible Server over TLS (sslmode=require)
+var databaseUrl = 'postgres://${postgresAdminUser}:${postgresAdminPassword}@${postgresServer.properties.fullyQualifiedDomainName}:5432/repohistory?sslmode=require'
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: appName
@@ -226,7 +227,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             { name: 'DATABASE_URL', secretRef: 'database-url' }
-            { name: 'DATABASE_SSL', value: 'false' }
+            { name: 'DATABASE_SSL', value: 'true' }
             { name: 'NEXTAUTH_SECRET', secretRef: 'auth-secret' }
             { name: 'AUTH_SECRET', secretRef: 'auth-secret' }
             { name: 'GITHUB_CLIENT_ID', secretRef: 'github-client-id' }
@@ -262,12 +263,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     }
   }
   // Role assignment must exist before Container App tries to pull from ACR
-  // postgres must be running before the web app starts
-  dependsOn: [acrPullRole, postgresApp]
+  dependsOn: [acrPullRole, postgresDb]
 }
 
 // ── Outputs ───────────────────────────────────────────────────────────────────
 output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
 output acrLoginServer string = acr.properties.loginServer
-output postgresInternalHost string = 'postgres'
+output postgresHost string = postgresServer.properties.fullyQualifiedDomainName
 output identityClientId string = identity.properties.clientId
