@@ -3,6 +3,7 @@
 // Estimated cost: ~$15-25/mo  (ACR Basic ~$5 + PostgreSQL Flexible Burstable B1ms ~$12 + Container Apps consumption ~$2-7 + Log Analytics ~$2)
 
 param location string = 'eastus'
+param pgLocation string = 'centralus' // Flexible Server not available in eastus; use centralus
 param appName string = 'repohistory'
 param postgresAdminUser string = 'repohistoryadmin'
 
@@ -98,7 +99,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
 // Burstable B1ms: 1 vCore, 2 GiB RAM — sufficient for this workload at ~$12/mo.
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   name: '${appName}-pg'
-  location: location
+  location: pgLocation
   sku: {
     name: 'Standard_B1ms'
     tier: 'Burstable'
